@@ -1,0 +1,6 @@
+{
+  "name": "ExeFun - Cognitive Training Platform",
+  "description": "An interactive, modern React cognitive training suite for Executive Function (EF) development, ADHD support, and student academic success.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
