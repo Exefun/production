@@ -504,7 +504,7 @@ const handleGoogleSignIn = async () => {
               email:
                 user?.email ||
                 user?.Email ||
-                'Exefun User',
+                '',
 
               avatarColor:
                 user?.avatarColor ||
