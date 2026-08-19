@@ -44,93 +44,104 @@ export default function Support({ setActiveTab }: SupportProps) {
     return emailRegex.test(emailStr);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    setError(null);
-    setFieldErrors({});
+  setError(null);
+  setFieldErrors({});
 
-    const newFieldErrors: {
-      name?: boolean;
-      email?: boolean;
-      message?: boolean;
-    } = {};
+  const newFieldErrors: typeof fieldErrors = {};
 
-    if (!name.trim()) {
-      newFieldErrors.name = true;
-    }
+  if (!name.trim()) {
+    newFieldErrors.name = true;
+  }
 
-    if (!email.trim()) {
-      newFieldErrors.email = true;
-    }
+  if (!email.trim()) {
+    newFieldErrors.email = true;
+  }
 
-    if (!message.trim()) {
-      newFieldErrors.message = true;
-    }
+  if (!message.trim()) {
+    newFieldErrors.message = true;
+  }
 
-    if (Object.keys(newFieldErrors).length > 0) {
-      setFieldErrors(newFieldErrors);
-      setError(
-        'Please fill in all the required fields (Name, Email, and Message).'
-      );
-      return;
-    }
+  if (Object.keys(newFieldErrors).length > 0) {
+    setFieldErrors(newFieldErrors);
+    setError(
+      'Please fill in all the required fields (Name, Email, and Message).'
+    );
+    return;
+  }
 
-    if (!validateEmail(email.trim())) {
-      setFieldErrors({ email: true });
-      setError('Please enter a valid academic or personal email address.');
-      return;
-    }
+  if (!validateEmail(email)) {
+    setFieldErrors({ email: true });
+    setError('Please enter a valid academic or personal email address.');
+    return;
+  }
 
-    setIsLoading(true);
+  setIsLoading(true);
 
-    try {
-      const response = await fetch(
-        'https://exefun.com/submitsupportform',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fullName: name.trim(),
-            email: email.trim(),
-            category,
-            affiliation: affiliation.trim(),
-            message: message.trim(),
-          }),
-        }
-      );
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || 'Unable to submit your support request.'
-        );
+    const response = await fetch(
+      `${API_BASE_URL}/submitsupportform`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: name.trim(),
+          email: email.trim(),
+          category,
+          affiliation: affiliation.trim(),
+          message: message.trim(),
+        }),
       }
+    );
 
-      setTicketId(data.ticketId);
-      setIsSuccess(true);
+ 
+    const contentType = response.headers.get('content-type') || '';
 
-      // Reset form after successful submission
-      setName('');
-      setEmail('');
-      setCategory('bug');
-      setAffiliation('');
-      setMessage('');
-    } catch (err) {
-      console.error('Support submission error:', err);
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
 
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to submit your support request. Please try again.'
+      console.error('Unexpected server response:', text);
+
+      throw new Error(
+        'The support server returned an unexpected response. Please check the API URL.'
       );
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.message || 'Unable to submit your support request.'
+      );
+    }
+
+    setTicketId(data.ticketId);
+    setIsSuccess(true);
+
+    // Reset form
+    setName('');
+    setEmail('');
+    setCategory('bug');
+    setAffiliation('');
+    setMessage('');
+  } catch (err) {
+    console.error('Support submission error:', err);
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'Unable to submit your support request. Please try again.'
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <motion.div
