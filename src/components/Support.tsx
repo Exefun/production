@@ -79,7 +79,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   setIsLoading(true);
 
   try {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+    const API_BASE_URL = import.meta.env.VITE_API_URL;
 
     console.log("🟦 SUPPORT: API_BASE_URL =", API_BASE_URL);
     console.log(
