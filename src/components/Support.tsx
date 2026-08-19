@@ -47,24 +47,20 @@ export default function Support({ setActiveTab }: SupportProps) {
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
+  console.log("🟦 SUPPORT: Form submission started");
+
   setError(null);
   setFieldErrors({});
 
   const newFieldErrors: typeof fieldErrors = {};
 
-  if (!name.trim()) {
-    newFieldErrors.name = true;
-  }
-
-  if (!email.trim()) {
-    newFieldErrors.email = true;
-  }
-
-  if (!message.trim()) {
-    newFieldErrors.message = true;
-  }
+  if (!name.trim()) newFieldErrors.name = true;
+  if (!email.trim()) newFieldErrors.email = true;
+  if (!message.trim()) newFieldErrors.message = true;
 
   if (Object.keys(newFieldErrors).length > 0) {
+    console.warn("🟨 SUPPORT: Frontend validation failed", newFieldErrors);
+
     setFieldErrors(newFieldErrors);
     setError(
       'Please fill in all the required fields (Name, Email, and Message).'
@@ -73,6 +69,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 
   if (!validateEmail(email)) {
+    console.warn("🟨 SUPPORT: Invalid email:", email);
+
     setFieldErrors({ email: true });
     setError('Please enter a valid academic or personal email address.');
     return;
@@ -83,6 +81,25 @@ const handleSubmit = async (e: React.FormEvent) => {
   try {
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+    console.log("🟦 SUPPORT: API_BASE_URL =", API_BASE_URL);
+    console.log(
+      "🟦 SUPPORT: Endpoint =",
+      `${API_BASE_URL}/submitsupportform`
+    );
+
+    const payload = {
+      fullName: name.trim(),
+      email: email.trim(),
+      category,
+      affiliation: affiliation.trim(),
+      message: message.trim(),
+    };
+
+    console.log("🟦 SUPPORT: Sending payload:", {
+      ...payload,
+      message: "[message hidden from console]",
+    });
+
     const response = await fetch(
       `${API_BASE_URL}/submitsupportform`,
       {
@@ -90,48 +107,67 @@ const handleSubmit = async (e: React.FormEvent) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          fullName: name.trim(),
-          email: email.trim(),
-          category,
-          affiliation: affiliation.trim(),
-          message: message.trim(),
-        }),
+        body: JSON.stringify(payload),
       }
     );
 
- 
+    console.log(
+      "🟩 SUPPORT: Server response status:",
+      response.status,
+      response.statusText
+    );
+
     const contentType = response.headers.get('content-type') || '';
+
+    console.log(
+      "🟩 SUPPORT: Response content-type:",
+      contentType
+    );
 
     if (!contentType.includes('application/json')) {
       const text = await response.text();
 
-      console.error('Unexpected server response:', text);
+      console.error(
+        "🟥 SUPPORT: Server returned non-JSON response:",
+        text
+      );
 
       throw new Error(
-        'The support server returned an unexpected response. Please check the API URL.'
+        `Support server returned ${response.status} instead of JSON.`
       );
     }
 
     const data = await response.json();
 
+    console.log("🟩 SUPPORT: Parsed server response:", data);
+
     if (!response.ok || !data.success) {
+      console.error(
+        "🟥 SUPPORT: Server reported failure:",
+        data
+      );
+
       throw new Error(
         data.message || 'Unable to submit your support request.'
       );
     }
 
+    console.log(
+      "✅ SUPPORT: Submission successful. Ticket:",
+      data.ticketId
+    );
+
     setTicketId(data.ticketId);
     setIsSuccess(true);
 
-    // Reset form
     setName('');
     setEmail('');
     setCategory('bug');
     setAffiliation('');
     setMessage('');
+
   } catch (err) {
-    console.error('Support submission error:', err);
+    console.error("🟥 SUPPORT: Submission exception:", err);
 
     setError(
       err instanceof Error
@@ -140,6 +176,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     );
   } finally {
     setIsLoading(false);
+    console.log("🟦 SUPPORT: Submission process finished");
   }
 };
 
