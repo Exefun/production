@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ArrowLeft, ChevronRight, MessageSquare, ShieldCheck, 
-  Clock, Send, CheckCircle2, AlertCircle, Building2, HelpCircle 
+import {
+  ArrowLeft,
+  ChevronRight,
+  MessageSquare,
+  ShieldCheck,
+  Clock,
+  Send,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  HelpCircle
 } from 'lucide-react';
 import { ActiveTab } from '../types';
 
@@ -11,53 +19,64 @@ interface SupportProps {
 }
 
 export default function Support({ setActiveTab }: SupportProps) {
-  // Form states
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState('bug');
   const [affiliation, setAffiliation] = useState('');
   const [message, setMessage] = useState('');
-  
-  // UX states
+
   const [error, setError] = useState<string | null>(null);
+
   const [fieldErrors, setFieldErrors] = useState<{
     name?: boolean;
     email?: boolean;
     message?: boolean;
   }>({});
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [ticketId, setTicketId] = useState('');
 
   const validateEmail = (emailStr: string) => {
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    const emailRegex =
+      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
     return emailRegex.test(emailStr);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setError(null);
     setFieldErrors({});
 
-    const newFieldErrors: typeof fieldErrors = {};
+    const newFieldErrors: {
+      name?: boolean;
+      email?: boolean;
+      message?: boolean;
+    } = {};
 
     if (!name.trim()) {
       newFieldErrors.name = true;
     }
+
     if (!email.trim()) {
       newFieldErrors.email = true;
     }
+
     if (!message.trim()) {
       newFieldErrors.message = true;
     }
 
     if (Object.keys(newFieldErrors).length > 0) {
       setFieldErrors(newFieldErrors);
-      setError('Please fill in all the required fields (Name, Email, and Message).');
+      setError(
+        'Please fill in all the required fields (Name, Email, and Message).'
+      );
       return;
     }
 
-    if (!validateEmail(email)) {
+    if (!validateEmail(email.trim())) {
       setFieldErrors({ email: true });
       setError('Please enter a valid academic or personal email address.');
       return;
@@ -65,21 +84,52 @@ export default function Support({ setActiveTab }: SupportProps) {
 
     setIsLoading(true);
 
-    // Simulate submission to support engine
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const response = await fetch(
+        'https://exefun.com/submitsupportform',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fullName: name.trim(),
+            email: email.trim(),
+            category,
+            affiliation: affiliation.trim(),
+            message: message.trim(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || 'Unable to submit your support request.'
+        );
+      }
+
+      setTicketId(data.ticketId);
       setIsSuccess(true);
-      // Generate a random academic support ticket ID
-      const randomTicket = `EF-SUP-${Math.floor(100000 + Math.random() * 900000)}`;
-      setTicketId(randomTicket);
-      
-      // Reset form
+
+      // Reset form after successful submission
       setName('');
       setEmail('');
       setCategory('bug');
       setAffiliation('');
       setMessage('');
-    }, 1200);
+    } catch (err) {
+      console.error('Support submission error:', err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to submit your support request. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -94,17 +144,21 @@ export default function Support({ setActiveTab }: SupportProps) {
       {/* Breadcrumb & Back button strip */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <nav className="flex items-center space-x-2 text-[11px] sm:text-xs font-mono tracking-wider text-slate-600 bg-white border border-slate-200 rounded-full py-1.5 px-4 shadow-sm w-fit">
-          <button 
+          <button
             onClick={() => setActiveTab('home')}
             className="hover:text-blue-600 hover:underline transition-colors cursor-pointer"
           >
             HOME
           </button>
+
           <ChevronRight className="h-3 w-3 text-slate-400" />
-          <span className="text-indigo-600 font-extrabold">SUPPORT PORTAL</span>
+
+          <span className="text-indigo-600 font-extrabold">
+            SUPPORT PORTAL
+          </span>
         </nav>
 
-        <button 
+        <button
           onClick={() => setActiveTab('home')}
           className="inline-flex items-center space-x-1.5 text-xs font-mono font-bold text-slate-500 hover:text-slate-900 transition-all cursor-pointer group w-fit"
         >
@@ -114,21 +168,24 @@ export default function Support({ setActiveTab }: SupportProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left Column: Trust and Information Content (Span 5) */}
+
+        {/* LEFT COLUMN */}
         <div className="lg:col-span-5 space-y-6">
+
           <div className="bg-white border border-slate-100 rounded-2xl p-6 sm:p-8 shadow-lg relative overflow-hidden">
-            {/* Ambient background glow */}
+
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
 
             <div className="flex items-center space-x-3 mb-6">
               <div className="bg-blue-500/10 p-2.5 rounded-xl border border-blue-500/20 text-blue-600 shrink-0">
                 <HelpCircle className="h-5 w-5" />
               </div>
+
               <div>
                 <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
                   HELP & INQUIRIES
                 </span>
+
                 <h2 className="text-xl font-extrabold text-slate-900 font-sans tracking-tight">
                   Support Commitment
                 </h2>
@@ -140,40 +197,49 @@ export default function Support({ setActiveTab }: SupportProps) {
             </p>
 
             <div className="space-y-5">
-              
-              {/* Trust point 1 */}
+
               <div className="flex gap-4">
                 <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/50">
                   <ShieldCheck className="h-4.5 w-4.5" />
                 </div>
+
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-800 font-sans">Privacy</h4>
+                  <h4 className="text-xs font-bold text-slate-800 font-sans">
+                    Privacy
+                  </h4>
+
                   <p className="text-xs text-slate-500 leading-normal font-sans">
                     Your queries and support logs are managed separately from cognitive game baselines. No personal identifiers are linked back to testing data.
                   </p>
                 </div>
               </div>
 
-              {/* Trust point 2 */}
               <div className="flex gap-4">
                 <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100/50">
                   <Clock className="h-4.5 w-4.5" />
                 </div>
+
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-800 font-sans">Direct Cohort SLA</h4>
+                  <h4 className="text-xs font-bold text-slate-800 font-sans">
+                    Direct Cohort SLA
+                  </h4>
+
                   <p className="text-xs text-slate-500 leading-normal font-sans">
                     You won't talk to automated chatbots or outsourced ticket farms. Your ticket is routed straight to our lead developmental psychologists and system engineers.
                   </p>
                 </div>
               </div>
 
-              {/* Trust point 3 */}
               <div className="flex gap-4">
                 <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100/50">
                   <Building2 className="h-4.5 w-4.5" />
                 </div>
+
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-800 font-sans">Institutional Governance</h4>
+                  <h4 className="text-xs font-bold text-slate-800 font-sans">
+                    Institutional Governance
+                  </h4>
+
                   <p className="text-xs text-slate-500 leading-normal font-sans">
                     Governed by ethical review parameters. We commit to zero diagnostic selling, zero dark patterns, and completely clear, honest disclosure.
                   </p>
@@ -182,20 +248,22 @@ export default function Support({ setActiveTab }: SupportProps) {
 
             </div>
 
-            {/* Quick stats/contact details */}
             <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-4 text-left">
               <div>
                 <span className="text-[9px] font-mono font-bold text-slate-400 block tracking-wider uppercase">
                   OPERATING HOURS
                 </span>
+
                 <span className="text-xs font-sans font-semibold text-slate-700">
                   Mon - Fri, 9AM - 5PM IST
                 </span>
               </div>
+
               <div>
                 <span className="text-[9px] font-mono font-bold text-slate-400 block tracking-wider uppercase">
                   TYPICAL REPLY
                 </span>
+
                 <span className="text-xs font-sans font-semibold text-slate-700">
                   &lt; 24 Working Hours
                 </span>
@@ -203,27 +271,29 @@ export default function Support({ setActiveTab }: SupportProps) {
             </div>
           </div>
 
-          {/* Quick FAQ info block */}
           <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-6 text-xs text-slate-500 leading-relaxed font-sans">
             <span className="font-extrabold text-slate-800 block mb-2 font-mono tracking-wider text-[10px] uppercase text-indigo-600">
               DID YOU KNOW?
             </span>
+
             Our executive functioning diagnostic tasks operate entirely in your local browser cache to preserve bandwidth. No gaming analytics are uploaded without your permission. If a module fails to load, clearing your browser site cache or refreshing solves 95% of issues!
           </div>
 
         </div>
 
-        {/* Right Column: Interactive Support Form (Span 7) */}
+        {/* RIGHT COLUMN */}
         <div className="lg:col-span-7">
+
           <div className="bg-white border border-slate-100 rounded-2xl p-6 sm:p-10 shadow-xl relative overflow-hidden min-h-[500px] flex flex-col justify-between">
-            
-            {/* Ambient background glow */}
+
             <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
 
-            {/* Form & Success container */}
             <div className="relative z-10 w-full h-full flex flex-col justify-center">
+
               <AnimatePresence mode="wait">
+
                 {isSuccess ? (
+
                   <motion.div
                     key="success-form"
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -234,28 +304,33 @@ export default function Support({ setActiveTab }: SupportProps) {
                     <div className="h-16 w-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mb-6">
                       <CheckCircle2 className="h-8 w-8 text-emerald-600 animate-bounce" />
                     </div>
-                    
+
                     <h3 className="text-xl font-sans font-extrabold text-slate-900 tracking-tight">
                       Support Ticket Generated
                     </h3>
-                    
-                    {/* Ticket badge */}
+
                     <div className="my-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-indigo-600 font-bold tracking-widest">
                       {ticketId}
                     </div>
 
                     <p className="text-slate-500 text-sm font-sans max-w-md leading-relaxed mb-8">
-                      Thank you for contributing to our research environment. We have securely queued your inquiry. A copy of this baseline request confirmation has been routed to your email, and our cohort engineers will follow up within 24 working hours.
+                      Thank you for contacting us. Your support request has been securely received and recorded. A confirmation email has been sent to your email address. Our team will review your inquiry and respond within 24 working hours.
                     </p>
 
                     <button
-                      onClick={() => setIsSuccess(false)}
+                      onClick={() => {
+                        setIsSuccess(false);
+                        setError(null);
+                        setFieldErrors({});
+                      }}
                       className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 active:scale-95"
                     >
                       Submit Another Query
                     </button>
                   </motion.div>
+
                 ) : (
+
                   <motion.div
                     key="active-form"
                     initial={{ opacity: 0 }}
@@ -263,119 +338,172 @@ export default function Support({ setActiveTab }: SupportProps) {
                     exit={{ opacity: 0 }}
                     className="space-y-6"
                   >
+
                     <div>
                       <h3 className="text-lg font-bold text-slate-900 font-sans tracking-tight flex items-center space-x-2">
                         <MessageSquare className="h-5 w-5 text-indigo-600" />
                         <span>Support Inquiry Form</span>
                       </h3>
+
                       <p className="text-slate-500 text-xs font-sans mt-1">
                         Complete the fields below to transmit an encrypted support or inquiry ticket.
                       </p>
                     </div>
 
                     {error && (
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-2.5 text-left text-xs text-red-600"
                       >
                         <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                        <span className="font-sans leading-relaxed">{error}</span>
+
+                        <span className="font-sans leading-relaxed">
+                          {error}
+                        </span>
                       </motion.div>
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Name Field */}
+
+                        {/* NAME */}
                         <div className="space-y-1.5 text-left">
                           <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
                             Your Name <span className="text-red-500">*</span>
                           </label>
+
                           <input
                             type="text"
                             required
                             value={name}
                             onChange={(e) => {
                               setName(e.target.value);
-                              if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: false }));
+
+                              if (fieldErrors.name) {
+                                setFieldErrors(prev => ({
+                                  ...prev,
+                                  name: false
+                                }));
+                              }
                             }}
                             placeholder="Aarav Sharma"
                             className={`w-full bg-slate-50 border ${
-                              fieldErrors.name ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'
+                              fieldErrors.name
+                                ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                                : 'border-slate-200 focus:border-blue-500'
                             } rounded-xl py-2.5 px-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
                           />
                         </div>
 
-                        {/* Email Field */}
+                        {/* EMAIL */}
                         <div className="space-y-1.5 text-left">
                           <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
                             Email Address <span className="text-red-500">*</span>
                           </label>
+
                           <input
                             type="email"
                             required
                             value={email}
                             onChange={(e) => {
                               setEmail(e.target.value);
-                              if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: false }));
+
+                              if (fieldErrors.email) {
+                                setFieldErrors(prev => ({
+                                  ...prev,
+                                  email: false
+                                }));
+                              }
                             }}
                             placeholder="aarav@xyz.com"
                             className={`w-full bg-slate-50 border ${
-                              fieldErrors.email ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'
+                              fieldErrors.email
+                                ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                                : 'border-slate-200 focus:border-blue-500'
                             } rounded-xl py-2.5 px-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Inquiry Category */}
+
+                        {/* CATEGORY */}
                         <div className="space-y-1.5 text-left">
                           <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
                             Inquiry Category <span className="text-red-500">*</span>
                           </label>
+
                           <select
                             value={category}
                             onChange={(e) => setCategory(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-sans appearance-none cursor-pointer"
                           >
-                            <option value="bug">Report Cognitive Module Bug</option>
-                            <option value="research">Academic Research Inquiry</option>
-                            <option value="collaboration">Institutional Collaboration</option>
-                            <option value="feedback">General Platform Feedback</option>
+                            <option value="bug">
+                              Report Cognitive Module Bug
+                            </option>
+
+                            <option value="research">
+                              Academic Research Inquiry
+                            </option>
+
+                            <option value="collaboration">
+                              Institutional Collaboration
+                            </option>
+
+                            <option value="feedback">
+                              General Platform Feedback
+                            </option>
                           </select>
                         </div>
 
-                        {/* Institution/Affiliation */}
+                        {/* AFFILIATION */}
                         <div className="space-y-1.5 text-left">
                           <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
-                            Institution / Affiliation <span className="text-slate-400 font-medium">(Optional)</span>
+                            Institution / Affiliation{' '}
+                            <span className="text-slate-400 font-medium">
+                              (Optional)
+                            </span>
                           </label>
+
                           <input
                             type="text"
                             value={affiliation}
-                            onChange={(e) => setAffiliation(e.target.value)}
+                            onChange={(e) =>
+                              setAffiliation(e.target.value)
+                            }
                             placeholder="e.g. IIT Delhi, Christ University"
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-sans"
                           />
                         </div>
                       </div>
 
-                      {/* Message Field */}
+                      {/* MESSAGE */}
                       <div className="space-y-1.5 text-left">
                         <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
                           Detailed Message <span className="text-red-500">*</span>
                         </label>
+
                         <textarea
                           required
                           value={message}
                           onChange={(e) => {
                             setMessage(e.target.value);
-                            if (fieldErrors.message) setFieldErrors(prev => ({ ...prev, message: false }));
+
+                            if (fieldErrors.message) {
+                              setFieldErrors(prev => ({
+                                ...prev,
+                                message: false
+                              }));
+                            }
                           }}
                           placeholder="Please formulate your details here. If reporting a module crash, please specify the game and your system browser details."
                           rows={5}
                           className={`w-full bg-slate-50 border ${
-                            fieldErrors.message ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'
+                            fieldErrors.message
+                              ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                              : 'border-slate-200 focus:border-blue-500'
                           } rounded-xl py-2.5 px-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans resize-none`}
                         />
                       </div>
@@ -384,7 +512,7 @@ export default function Support({ setActiveTab }: SupportProps) {
                         By submitting this support request, you agree that our system administrators may process your contact credentials solely for resolving your inquiry. Your private records are protected.
                       </div>
 
-                      {/* Submit Button */}
+                      {/* SUBMIT */}
                       <button
                         type="submit"
                         disabled={isLoading}
@@ -392,15 +520,37 @@ export default function Support({ setActiveTab }: SupportProps) {
                       >
                         {isLoading ? (
                           <>
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            <svg
+                              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
                             </svg>
-                            <span>Encrypting & Sending Ticket...</span>
+
+                            <span>
+                              Sending Support Ticket...
+                            </span>
                           </>
                         ) : (
                           <>
-                            <span>Transmit Support Ticket</span>
+                            <span>
+                              Transmit Support Ticket
+                            </span>
+
                             <Send className="h-4 w-4" />
                           </>
                         )}
@@ -409,12 +559,11 @@ export default function Support({ setActiveTab }: SupportProps) {
                     </form>
                   </motion.div>
                 )}
+
               </AnimatePresence>
             </div>
-
           </div>
         </div>
-
       </div>
     </motion.div>
   );
