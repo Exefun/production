@@ -1,23 +1,63 @@
 import React, { useState, useEffect } from 'react';
+
 import {
-  Brain, Mail, Lock, Eye, EyeOff, User, Phone,
-  CheckCircle2, ArrowRight, Sparkles, AlertCircle, ArrowLeft
+  Brain,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  Phone,
+  CheckCircle2,
+  ArrowRight,
+  Sparkles,
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+
+import {
+  motion,
+  AnimatePresence
+} from 'motion/react';
+
 import { ActiveTab } from '../types';
 
 
+// --------------------------------------------------
+// AUTHENTICATED USER TYPE
+// --------------------------------------------------
+
+interface AuthUser {
+  name: string;
+  email: string;
+  avatarColor: string;
+  avatarTag: string;
+  focusArea: string;
+}
+
+
+// --------------------------------------------------
+// AUTH PROPS
+// --------------------------------------------------
+
 interface AuthProps {
-  onLogin: (user: {
-    name: string;
-    email: string;
-    avatarColor: string;
-    avatarTag: string;
-    focusArea: string;
-  }) => void;
-  setActiveTab: (tab: ActiveTab, mode?: 'login' | 'register') => void;
+
+  onLogin: (
+    user: AuthUser
+  ) => void;
+
+  setActiveTab: (
+    tab: ActiveTab,
+    mode?: 'login' | 'register'
+  ) => void;
+
   initialMode?: 'login' | 'register';
 }
+
+
+// --------------------------------------------------
+// AUTH COMPONENT
+// --------------------------------------------------
 
 export default function Auth({
   onLogin,
@@ -25,89 +65,175 @@ export default function Auth({
   initialMode = 'login'
 }: AuthProps) {
 
-  const [isRegister, setIsRegister] = useState(
-    initialMode === 'register'
-  );
+  const [isRegister, setIsRegister] =
+    useState(
+      initialMode === 'register'
+    );
+
+
+  // --------------------------------------------------
+  // GOOGLE SCRIPT
+  // --------------------------------------------------
 
   useEffect(() => {
-  const script = document.createElement('script');
 
-  script.src = 'https://accounts.google.com/gsi/client';
-  script.async = true;
-  script.defer = true;
+    const script =
+      document.createElement('script');
 
-  document.head.appendChild(script);
+    script.src =
+      'https://accounts.google.com/gsi/client';
 
-  return () => {
-    document.head.removeChild(script);
-  };
-}, []);
+    script.async = true;
+    script.defer = true;
+
+    document.head.appendChild(script);
+
+    return () => {
+
+      document.head.removeChild(script);
+
+    };
+
+  }, []);
+
+
+  // --------------------------------------------------
+  // SYNC AUTH MODE
+  // --------------------------------------------------
 
   useEffect(() => {
-    setIsRegister(initialMode === 'register');
+
+    setIsRegister(
+      initialMode === 'register'
+    );
+
   }, [initialMode]);
+
 
   // --------------------------------------------------
   // FIELD STATES
   // --------------------------------------------------
 
-  const [fullName, setFullName] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] =
+    useState('');
+
+  const [contactNumber, setContactNumber] =
+    useState('');
+
+  const [email, setEmail] =
+    useState('');
+
+  const [password, setPassword] =
+    useState('');
+
+  const [confirmPassword, setConfirmPassword] =
+    useState('');
+
 
   // --------------------------------------------------
   // PASSWORD VISIBILITY
   // --------------------------------------------------
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
+
 
   // --------------------------------------------------
   // UI STATES
   // --------------------------------------------------
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] =
+    useState<string | null>(null);
 
-  const [fieldErrors, setFieldErrors] = useState<{
-    fullName?: boolean;
-    contactNumber?: boolean;
-    email?: boolean;
-    password?: boolean;
-    confirmPassword?: boolean;
-  }>({});
+  const [fieldErrors, setFieldErrors] =
+    useState<{
+      fullName?: boolean;
+      contactNumber?: boolean;
+      email?: boolean;
+      password?: boolean;
+      confirmPassword?: boolean;
+    }>({});
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoading, setIsLoading] =
+    useState(false);
+
+  const [isSuccess, setIsSuccess] =
+    useState(false);
+
 
   // --------------------------------------------------
   // API BASE URL
-  // Uses your existing Netlify environment variable.
   // --------------------------------------------------
 
   const apiBaseUrl =
     import.meta.env.VITE_API_URL;
 
+
   // --------------------------------------------------
   // EMAIL VALIDATION
   // --------------------------------------------------
 
-  const validateEmail = (emailStr: string) => {
+  const validateEmail = (
+    emailStr: string
+  ) => {
+
     const emailRegex =
       /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
     return emailRegex.test(emailStr);
+
   };
+
 
   // --------------------------------------------------
   // CLEAR ERRORS
   // --------------------------------------------------
 
   const clearErrors = () => {
+
     setError(null);
     setFieldErrors({});
+
   };
+
+
+  // --------------------------------------------------
+  // PERSIST AUTHENTICATED USER
+  // --------------------------------------------------
+
+  /**
+   * Saves the user object locally so that App.tsx can
+   * restore the authenticated dashboard after a browser
+   * refresh.
+   *
+   * This does NOT replace the authentication token.
+   * The token remains the actual authentication credential.
+   */
+  const persistAuthenticatedUser = (
+    user: AuthUser
+  ) => {
+
+    try {
+
+      localStorage.setItem(
+        'exefun_user',
+        JSON.stringify(user)
+      );
+
+    } catch (error) {
+
+      console.error(
+        'Unable to persist authenticated user:',
+        error
+      );
+
+    }
+
+  };
+
 
   // --------------------------------------------------
   // HANDLE REGISTRATION
@@ -115,7 +241,13 @@ export default function Auth({
 
   const handleRegister = async () => {
 
-    const errors: typeof fieldErrors = {};
+    const errors:
+      typeof fieldErrors = {};
+
+
+    // ------------------------------------------
+    // VALIDATION
+    // ------------------------------------------
 
     if (!fullName.trim()) {
       errors.fullName = true;
@@ -145,6 +277,11 @@ export default function Auth({
       errors.confirmPassword = true;
     }
 
+
+    // ------------------------------------------
+    // VALIDATION ERROR
+    // ------------------------------------------
+
     if (Object.keys(errors).length > 0) {
 
       setFieldErrors(errors);
@@ -153,19 +290,45 @@ export default function Auth({
         errors.confirmPassword &&
         password !== confirmPassword
       ) {
-        setError('Passwords do not match.');
+
+        setError(
+          'Passwords do not match.'
+        );
+
       } else if (errors.contactNumber) {
-        setError('Please enter a valid 10-digit contact number.');
+
+        setError(
+          'Please enter a valid 10-digit contact number.'
+        );
+
       } else if (errors.email) {
-        setError('Please enter a valid email address.');
+
+        setError(
+          'Please enter a valid email address.'
+        );
+
       } else if (errors.password) {
-        setError('Password must contain at least 8 characters.');
+
+        setError(
+          'Password must contain at least 8 characters.'
+        );
+
       } else {
-        setError('Please complete all required fields.');
+
+        setError(
+          'Please complete all required fields.'
+        );
+
       }
 
       return;
+
     }
+
+
+    // ------------------------------------------
+    // API REQUEST
+    // ------------------------------------------
 
     try {
 
@@ -173,74 +336,155 @@ export default function Auth({
       setError(null);
       setFieldErrors({});
 
-      const response = await fetch(
-        `${apiBaseUrl}/registeruser`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-  FullName: fullName.trim(),
-  Phone: contactNumber,
-  Email: email.trim().toLowerCase(),
-  Pass: password,
-  ConfirmPassword: confirmPassword
-})
-        }
-      );
 
-      const data = await response.json();
+      const response =
+        await fetch(
+          `${apiBaseUrl}/registeruser`,
+          {
+            method: 'POST',
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || 'Registration failed. Please try again.'
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body: JSON.stringify({
+              FullName:
+                fullName.trim(),
+
+              Phone:
+                contactNumber,
+
+              Email:
+                email.trim().toLowerCase(),
+
+              Pass:
+                password,
+
+              ConfirmPassword:
+                confirmPassword
+            })
+          }
         );
+
+
+      const data =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
+        throw new Error(
+          data.message ||
+          'Registration failed. Please try again.'
+        );
+
       }
 
-      // Save authentication token if returned.
+
+      // ------------------------------------------
+      // SAVE AUTHENTICATION TOKEN
+      // ------------------------------------------
+
       if (data.token) {
+
         localStorage.setItem(
           'exefun_token',
           data.token
         );
+
       }
 
+
       if (data.userId) {
+
         localStorage.setItem(
           'exefun_user_id',
           String(data.userId)
         );
+
       }
+
+
+      // ------------------------------------------
+      // BUILD REGISTERED USER
+      // ------------------------------------------
+
+      const registeredUser: AuthUser = {
+
+        name:
+          fullName.trim(),
+
+        email:
+          email.trim().toLowerCase(),
+
+        avatarColor:
+          'bg-blue-600',
+
+        avatarTag:
+          fullName
+            .trim()
+            .charAt(0)
+            .toUpperCase(),
+
+        focusArea:
+          'Executive Functioning'
+
+      };
+
+
+      // ------------------------------------------
+      // PERSIST USER SESSION
+      // ------------------------------------------
+
+      persistAuthenticatedUser(
+        registeredUser
+      );
+
+
+      // ------------------------------------------
+      // SUCCESS SCREEN
+      // ------------------------------------------
 
       setIsSuccess(true);
 
-      // Give the success animation a moment to display.
+
+      // Give the success animation a moment
+      // to display before navigating.
+
       setTimeout(() => {
 
-        onLogin({
-          name: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          avatarColor: 'bg-blue-600',
-          avatarTag: fullName.trim().charAt(0).toUpperCase(),
-          focusArea: 'Executive Functioning'
-        });
+        onLogin(
+          registeredUser
+        );
 
       }, 1500);
 
+
     } catch (err: any) {
 
-      console.error('Registration error:', err);
+      console.error(
+        'Registration error:',
+        err
+      );
 
       setError(
         err?.message ||
         'Unable to connect to the registration service.'
       );
 
+
     } finally {
+
       setIsLoading(false);
+
     }
+
   };
+
 
   // --------------------------------------------------
   // HANDLE EMAIL LOGIN
@@ -248,7 +492,13 @@ export default function Auth({
 
   const handleLogin = async () => {
 
-    const errors: typeof fieldErrors = {};
+    const errors:
+      typeof fieldErrors = {};
+
+
+    // ------------------------------------------
+    // VALIDATION
+    // ------------------------------------------
 
     if (!validateEmail(email.trim())) {
       errors.email = true;
@@ -258,18 +508,33 @@ export default function Auth({
       errors.password = true;
     }
 
+
     if (Object.keys(errors).length > 0) {
 
       setFieldErrors(errors);
 
       if (errors.email) {
-        setError('Please enter a valid email address.');
+
+        setError(
+          'Please enter a valid email address.'
+        );
+
       } else {
-        setError('Please enter your password.');
+
+        setError(
+          'Please enter your password.'
+        );
+
       }
 
       return;
+
     }
+
+
+    // ------------------------------------------
+    // API REQUEST
+    // ------------------------------------------
 
     try {
 
@@ -277,105 +542,150 @@ export default function Auth({
       setError(null);
       setFieldErrors({});
 
-      const response = await fetch(
-        `${apiBaseUrl}/loginuseremail`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            Email: email.trim().toLowerCase(),
-            Pass: password
-          })
-        }
-      );
 
-      const data = await response.json();
+      const response =
+        await fetch(
+          `${apiBaseUrl}/loginuseremail`,
+          {
+            method: 'POST',
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || 'Login failed. Please check your credentials.'
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body: JSON.stringify({
+              Email:
+                email.trim().toLowerCase(),
+
+              Pass:
+                password
+            })
+          }
         );
+
+
+      const data =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
+        throw new Error(
+          data.message ||
+          'Login failed. Please check your credentials.'
+        );
+
       }
 
+
+      // ------------------------------------------
+      // SAVE AUTHENTICATION TOKEN
+      // ------------------------------------------
+
       if (data.token) {
+
         localStorage.setItem(
           'exefun_token',
           data.token
         );
+
       }
 
+
       if (data.userId) {
+
         localStorage.setItem(
           'exefun_user_id',
           String(data.userId)
         );
+
       }
+
+
+      // ------------------------------------------
+      // BUILD USER
+      // ------------------------------------------
+
+      const loggedInUser: AuthUser = {
+
+        name:
+          data.user?.FullName ||
+          data.user?.fullName ||
+          'Exefun User',
+
+        email:
+          data.user?.Email ||
+          data.user?.email ||
+          email.trim().toLowerCase(),
+
+        avatarColor:
+          'bg-blue-600',
+
+        avatarTag:
+          (
+            data.user?.FullName ||
+            data.user?.fullName ||
+            'E'
+          )
+            .charAt(0)
+            .toUpperCase(),
+
+        focusArea:
+          'Executive Functioning'
+
+      };
+
+
+      // ------------------------------------------
+      // PERSIST USER SESSION
+      // ------------------------------------------
+
+      persistAuthenticatedUser(
+        loggedInUser
+      );
+
+
+      // ------------------------------------------
+      // SUCCESS SCREEN
+      // ------------------------------------------
 
       setIsSuccess(true);
 
-      // Retrieve profile information after successful authentication.
-      if (data.user) {
 
-        setTimeout(() => {
+      setTimeout(() => {
 
-          onLogin({
-            name:
-              data.user.FullName ||
-              data.user.fullName ||
-              'Exefun User',
+        onLogin(
+          loggedInUser
+        );
 
-            email:
-              data.user.Email ||
-              data.user.email ||
-              email.trim().toLowerCase(),
+      }, 1500);
 
-            avatarColor: 'bg-blue-600',
-
-            avatarTag:
-              (
-                data.user.FullName ||
-                data.user.fullName ||
-                'E'
-              )
-                .charAt(0)
-                .toUpperCase(),
-
-            focusArea: 'Executive Functioning'
-          });
-
-        }, 1500);
-
-      } else {
-
-        // Fallback while server.js is finalized.
-        setTimeout(() => {
-
-          onLogin({
-            name: 'Exefun User',
-            email: email.trim().toLowerCase(),
-            avatarColor: 'bg-blue-600',
-            avatarTag: 'E',
-            focusArea: 'Executive Functioning'
-          });
-
-        }, 1500);
-      }
 
     } catch (err: any) {
 
-      console.error('Login error:', err);
+      console.error(
+        'Login error:',
+        err
+      );
 
       setError(
         err?.message ||
         'Unable to connect to the login service.'
       );
 
+
     } finally {
+
       setIsLoading(false);
+
     }
+
   };
+
 
   // --------------------------------------------------
   // SUBMIT HANDLER
@@ -387,182 +697,270 @@ export default function Auth({
 
     e.preventDefault();
 
-    if (isLoading || isSuccess) {
+
+    if (
+      isLoading ||
+      isSuccess
+    ) {
+
       return;
+
     }
+
 
     clearErrors();
 
+
     if (isRegister) {
+
       await handleRegister();
+
     } else {
+
       await handleLogin();
+
     }
+
   };
+
 
   // --------------------------------------------------
   // GOOGLE SIGN-IN
-  //
-  // Actual Google verification remains server-side.
-  // Server.js will be updated separately.
   // --------------------------------------------------
 
-const handleGoogleSignIn = async () => {
+  /**
+   * Google authentication is still verified server-side.
+   * The only addition here is persistence of the resulting
+   * authenticated user.
+   */
 
-  setError(null);
+  const handleGoogleSignIn = async () => {
 
-  if (isLoading || isSuccess) {
-    return;
-  }
+    setError(null);
 
-  try {
 
-    setIsLoading(true);
+    if (
+      isLoading ||
+      isSuccess
+    ) {
 
-    const google = (window as any).google;
+      return;
 
-    if (!google?.accounts?.id) {
-      throw new Error(
-        'Google authentication is not available. Please try again.'
-      );
     }
 
-    google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
 
-      callback: async (response: any) => {
+    try {
 
-        try {
+      setIsLoading(true);
 
-          if (!response?.credential) {
-            throw new Error(
-              'Google authentication did not return a credential.'
-            );
-          }
 
-          const serverResponse = await fetch(
-            `${apiBaseUrl}/google-login`,
-            {
-              method: 'POST',
+      const google =
+        (window as any).google;
 
-              headers: {
-                'Content-Type': 'application/json'
-              },
 
-              body: JSON.stringify({
-                token: response.credential
-              })
-            }
-          );
+      if (
+        !google?.accounts?.id
+      ) {
 
-          const data =
-            await serverResponse.json();
+        throw new Error(
+          'Google authentication is not available. Please try again.'
+        );
 
-          if (
-            !serverResponse.ok ||
-            !data.success
-          ) {
-            throw new Error(
-              data.message ||
-              'Google login failed. Please try again.'
-            );
-          }
+      }
 
-          // ------------------------------------------
-          // SAVE AUTHENTICATION
-          // ------------------------------------------
 
-          if (data.token) {
-            localStorage.setItem(
-              'exefun_token',
-              data.token
-            );
-          }
+      google.accounts.id.initialize({
 
-          if (data.userId) {
-            localStorage.setItem(
-              'exefun_user_id',
-              String(data.userId)
-            );
-          }
+        client_id:
+          import.meta.env.VITE_GOOGLE_CLIENT_ID,
 
-          // ------------------------------------------
-          // SUCCESS
-          // ------------------------------------------
+        callback:
+          async (response: any) => {
 
-          setIsSuccess(true);
+            try {
 
-          const user = data.user;
+              if (
+                !response?.credential
+              ) {
 
-          setTimeout(() => {
+                throw new Error(
+                  'Google authentication did not return a credential.'
+                );
 
-            onLogin({
-              name:
-                user?.name ||
-                user?.FullName ||
-                'Exefun User',
+              }
 
-              email:
-                user?.email ||
-                user?.Email ||
-                '',
 
-              avatarColor:
-                user?.avatarColor ||
-                'bg-blue-600',
+              const serverResponse =
+                await fetch(
+                  `${apiBaseUrl}/google-login`,
+                  {
+                    method: 'POST',
 
-              avatarTag:
-                user?.avatarTag ||
-                (
+                    headers: {
+                      'Content-Type':
+                        'application/json'
+                    },
+
+                    body: JSON.stringify({
+                      token:
+                        response.credential
+                    })
+                  }
+                );
+
+
+              const data =
+                await serverResponse.json();
+
+
+              if (
+                !serverResponse.ok ||
+                !data.success
+              ) {
+
+                throw new Error(
+                  data.message ||
+                  'Google login failed. Please try again.'
+                );
+
+              }
+
+
+              // ------------------------------------------
+              // SAVE AUTHENTICATION
+              // ------------------------------------------
+
+              if (data.token) {
+
+                localStorage.setItem(
+                  'exefun_token',
+                  data.token
+                );
+
+              }
+
+
+              if (data.userId) {
+
+                localStorage.setItem(
+                  'exefun_user_id',
+                  String(data.userId)
+                );
+
+              }
+
+
+              // ------------------------------------------
+              // BUILD GOOGLE USER
+              // ------------------------------------------
+
+              const user =
+                data.user;
+
+
+              const googleUser: AuthUser = {
+
+                name:
                   user?.name ||
                   user?.FullName ||
-                  'E'
-                )
-                  .charAt(0)
-                  .toUpperCase(),
+                  'Exefun User',
 
-              focusArea:
-                user?.focusArea ||
-                'Executive Functioning'
-            });
+                email:
+                  user?.email ||
+                  user?.Email ||
+                  '',
 
-          }, 1500);
+                avatarColor:
+                  user?.avatarColor ||
+                  'bg-blue-600',
 
-        } catch (err: any) {
+                avatarTag:
+                  user?.avatarTag ||
+                  (
+                    user?.name ||
+                    user?.FullName ||
+                    'E'
+                  )
+                    .charAt(0)
+                    .toUpperCase(),
 
-          console.error(
-            'Google login error:',
-            err
-          );
+                focusArea:
+                  user?.focusArea ||
+                  'Executive Functioning'
 
-          setError(
-            err?.message ||
-            'Google login failed. Please try again.'
-          );
+              };
 
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    });
 
-    google.accounts.id.prompt();
+              // ------------------------------------------
+              // PERSIST GOOGLE SESSION
+              // ------------------------------------------
 
-  } catch (err: any) {
+              persistAuthenticatedUser(
+                googleUser
+              );
 
-    console.error(
-      'Google authentication initialization error:',
-      err
-    );
 
-    setError(
-      err?.message ||
-      'Unable to start Google authentication.'
-    );
+              // ------------------------------------------
+              // SUCCESS
+              // ------------------------------------------
 
-    setIsLoading(false);
-  }
-};
+              setIsSuccess(true);
+
+
+              setTimeout(() => {
+
+                onLogin(
+                  googleUser
+                );
+
+              }, 1500);
+
+
+            } catch (err: any) {
+
+              console.error(
+                'Google login error:',
+                err
+              );
+
+              setError(
+                err?.message ||
+                'Google login failed. Please try again.'
+              );
+
+
+            } finally {
+
+              setIsLoading(false);
+
+            }
+
+          }
+
+      });
+
+
+      google.accounts.id.prompt();
+
+
+    } catch (err: any) {
+
+      console.error(
+        'Google authentication initialization error:',
+        err
+      );
+
+      setError(
+        err?.message ||
+        'Unable to start Google authentication.'
+      );
+
+      setIsLoading(false);
+
+    }
+
+  };
+
 
   // --------------------------------------------------
   // SWITCH MODE
@@ -580,32 +978,50 @@ const handleGoogleSignIn = async () => {
     setPassword('');
     setConfirmPassword('');
 
+
     if (!register) {
+
       setFullName('');
       setContactNumber('');
+
     }
+
   };
 
+
+  // --------------------------------------------------
+  // RENDER
+  // --------------------------------------------------
+
   return (
+
     <div
       className="w-full min-h-[85vh] flex items-center justify-center px-4 py-16 sm:py-24 bg-slate-50 relative overflow-hidden"
       id="auth-root"
     >
 
       {/* Decorative ambient background glows */}
+
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/5 rounded-full blur-3xl pointer-events-none" />
 
+
       <div className="w-full max-w-md relative z-10">
 
-        {/* Breadcrumb Strip */}
+
+        {/* ------------------------------------------------ */}
+        {/* BREADCRUMB STRIP */}
+        {/* ------------------------------------------------ */}
+
         <div className="flex items-center justify-between mb-6">
 
           <nav className="flex items-center space-x-2 text-[10px] sm:text-xs font-mono tracking-wider text-slate-600 bg-white border border-slate-200 rounded-full py-1.5 px-4 shadow-sm">
 
             <button
-              onClick={() => setActiveTab('home')}
+              onClick={() =>
+                setActiveTab('home')
+              }
               className="hover:text-blue-600 hover:underline transition-colors cursor-pointer"
             >
               HOME
@@ -616,17 +1032,23 @@ const handleGoogleSignIn = async () => {
             </span>
 
             <span className="text-indigo-600 font-extrabold">
+
               {isRegister
                 ? 'REGISTRATION'
                 : 'PORTAL SIGN IN'}
+
             </span>
 
           </nav>
 
+
           <button
-            onClick={() => setActiveTab('home')}
+            onClick={() =>
+              setActiveTab('home')
+            }
             className="inline-flex items-center space-x-1.5 text-xs font-mono font-bold text-slate-500 hover:text-slate-900 transition-all cursor-pointer group"
           >
+
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
 
             <span>
@@ -637,7 +1059,11 @@ const handleGoogleSignIn = async () => {
 
         </div>
 
-        {/* Success Screen Overlay */}
+
+        {/* ------------------------------------------------ */}
+        {/* SUCCESS SCREEN OVERLAY */}
+        {/* ------------------------------------------------ */}
+
         <AnimatePresence>
 
           {isSuccess && (
@@ -664,9 +1090,13 @@ const handleGoogleSignIn = async () => {
 
               </div>
 
+
               <h3 className="text-xl font-sans font-extrabold text-slate-900">
+
                 Verification Successful
+
               </h3>
+
 
               <p className="text-slate-500 text-xs sm:text-sm font-sans mt-2 max-w-xs leading-relaxed">
 
@@ -675,6 +1105,7 @@ const handleGoogleSignIn = async () => {
                   : 'Welcome back! Your account has been authenticated successfully.'}
 
               </p>
+
 
               <div className="flex items-center space-x-2 mt-6 text-indigo-600 text-xs font-mono">
 
@@ -692,10 +1123,16 @@ const handleGoogleSignIn = async () => {
 
         </AnimatePresence>
 
-        {/* Auth Card Container */}
+
+        {/* ------------------------------------------------ */}
+        {/* AUTH CARD */}
+        {/* ------------------------------------------------ */}
+
         <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
 
+
           {/* Header */}
+
           <div className="text-center space-y-3 mb-8">
 
             <div className="inline-flex items-center justify-center space-x-2">
@@ -716,6 +1153,7 @@ const handleGoogleSignIn = async () => {
 
             </div>
 
+
             <div>
 
               <h2 className="text-xl sm:text-2xl font-sans font-extrabold text-slate-900 tracking-tight">
@@ -725,6 +1163,7 @@ const handleGoogleSignIn = async () => {
                   : 'Portal Sign In'}
 
               </h2>
+
 
               <p className="text-slate-500 text-xs sm:text-sm font-sans mt-1">
 
@@ -738,7 +1177,11 @@ const handleGoogleSignIn = async () => {
 
           </div>
 
-          {/* Google Button */}
+
+          {/* ------------------------------------------------ */}
+          {/* GOOGLE BUTTON */}
+          {/* ------------------------------------------------ */}
+
           <div className="space-y-4">
 
             <button
@@ -776,28 +1219,37 @@ const handleGoogleSignIn = async () => {
 
               </svg>
 
+
               <span>
+
                 {isRegister
                   ? 'Register with Google'
                   : 'Sign in with Google'}
+
               </span>
 
             </button>
 
+
             {/* Divider */}
+
             <div className="relative flex py-2 items-center">
 
               <div className="flex-grow border-t border-slate-200" />
 
               <span className="flex-shrink mx-4 text-[10px] font-mono uppercase text-slate-400 tracking-widest bg-white px-2">
+
                 or continue with email
+
               </span>
 
               <div className="flex-grow border-t border-slate-200" />
 
             </div>
 
+
             {/* Error */}
+
             {error && (
 
               <motion.div
@@ -822,29 +1274,43 @@ const handleGoogleSignIn = async () => {
 
             )}
 
-            {/* Form */}
+
+            {/* ------------------------------------------------ */}
+            {/* FORM */}
+            {/* ------------------------------------------------ */}
+
             <form
               onSubmit={handleSubmit}
               className="space-y-4 text-left"
             >
 
+
               {/* Registration fields */}
+
               {isRegister && (
 
                 <div className="grid grid-cols-1 gap-4">
 
+
                   {/* Full Name */}
+
                   <div className="space-y-1.5">
 
                     <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
                       Full Name
+
                     </label>
+
 
                     <div className="relative">
 
                       <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
                         <User className="h-4 w-4" />
+
                       </div>
+
 
                       <input
                         type="text"
@@ -852,13 +1318,21 @@ const handleGoogleSignIn = async () => {
                         value={fullName}
                         onChange={(e) => {
 
-                          setFullName(e.target.value);
+                          setFullName(
+                            e.target.value
+                          );
 
-                          if (fieldErrors.fullName) {
-                            setFieldErrors(prev => ({
-                              ...prev,
-                              fullName: false
-                            }));
+                          if (
+                            fieldErrors.fullName
+                          ) {
+
+                            setFieldErrors(
+                              prev => ({
+                                ...prev,
+                                fullName: false
+                              })
+                            );
+
                           }
 
                           setError(null);
@@ -876,7 +1350,9 @@ const handleGoogleSignIn = async () => {
 
                   </div>
 
+
                   {/* Contact Number */}
+
                   <div className="space-y-1.5">
 
                     <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
@@ -889,11 +1365,15 @@ const handleGoogleSignIn = async () => {
 
                     </label>
 
+
                     <div className="relative">
 
                       <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
                         <Phone className="h-4 w-4" />
+
                       </div>
+
 
                       <input
                         type="tel"
@@ -907,13 +1387,21 @@ const handleGoogleSignIn = async () => {
                               .replace(/\D/g, '')
                               .slice(0, 10);
 
-                          setContactNumber(cleaned);
+                          setContactNumber(
+                            cleaned
+                          );
 
-                          if (fieldErrors.contactNumber) {
-                            setFieldErrors(prev => ({
-                              ...prev,
-                              contactNumber: false
-                            }));
+                          if (
+                            fieldErrors.contactNumber
+                          ) {
+
+                            setFieldErrors(
+                              prev => ({
+                                ...prev,
+                                contactNumber: false
+                              })
+                            );
+
                           }
 
                           setError(null);
@@ -935,18 +1423,26 @@ const handleGoogleSignIn = async () => {
 
               )}
 
+
               {/* Email */}
+
               <div className="space-y-1.5">
 
                 <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
                   Email Address
+
                 </label>
+
 
                 <div className="relative">
 
                   <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
                     <Mail className="h-4 w-4" />
+
                   </div>
+
 
                   <input
                     type="email"
@@ -954,13 +1450,21 @@ const handleGoogleSignIn = async () => {
                     value={email}
                     onChange={(e) => {
 
-                      setEmail(e.target.value);
+                      setEmail(
+                        e.target.value
+                      );
 
-                      if (fieldErrors.email) {
-                        setFieldErrors(prev => ({
-                          ...prev,
-                          email: false
-                        }));
+                      if (
+                        fieldErrors.email
+                      ) {
+
+                        setFieldErrors(
+                          prev => ({
+                            ...prev,
+                            email: false
+                          })
+                        );
+
                       }
 
                       setError(null);
@@ -978,7 +1482,9 @@ const handleGoogleSignIn = async () => {
 
               </div>
 
+
               {/* Password Fields */}
+
               <div
                 className={
                   isRegister
@@ -987,18 +1493,26 @@ const handleGoogleSignIn = async () => {
                 }
               >
 
+
                 {/* Password */}
+
                 <div className="space-y-1.5">
 
                   <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
                     Password
+
                   </label>
+
 
                   <div className="relative">
 
                     <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
                       <Lock className="h-4 w-4" />
+
                     </div>
+
 
                     <input
                       type={
@@ -1010,13 +1524,21 @@ const handleGoogleSignIn = async () => {
                       value={password}
                       onChange={(e) => {
 
-                        setPassword(e.target.value);
+                        setPassword(
+                          e.target.value
+                        );
 
-                        if (fieldErrors.password) {
-                          setFieldErrors(prev => ({
-                            ...prev,
-                            password: false
-                          }));
+                        if (
+                          fieldErrors.password
+                        ) {
+
+                          setFieldErrors(
+                            prev => ({
+                              ...prev,
+                              password: false
+                            })
+                          );
+
                         }
 
                         setError(null);
@@ -1030,45 +1552,66 @@ const handleGoogleSignIn = async () => {
                       } rounded-xl py-2.5 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
                     />
 
+
                     <button
                       type="button"
                       onClick={() =>
-                        setShowPassword(!showPassword)
+                        setShowPassword(
+                          !showPassword
+                        )
                       }
                       className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
                     >
 
                       {showPassword
-                        ? <EyeOff className="h-4 w-4 text-slate-400" />
-                        : <Eye className="h-4 w-4 text-slate-400" />}
+
+                        ? (
+                          <EyeOff className="h-4 w-4 text-slate-400" />
+                        )
+
+                        : (
+                          <Eye className="h-4 w-4 text-slate-400" />
+                        )}
 
                     </button>
 
                   </div>
 
+
                   {/* Password requirement */}
+
                   {isRegister && (
+
                     <p className="text-[9px] text-slate-400">
                       Minimum 8 characters
                     </p>
+
                   )}
 
                 </div>
 
+
                 {/* Confirm Password */}
+
                 {isRegister && (
 
                   <div className="space-y-1.5">
 
                     <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
                       Confirm Password
+
                     </label>
+
 
                     <div className="relative">
 
                       <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
                         <Lock className="h-4 w-4" />
+
                       </div>
+
 
                       <input
                         type={
@@ -1084,11 +1627,17 @@ const handleGoogleSignIn = async () => {
                             e.target.value
                           );
 
-                          if (fieldErrors.confirmPassword) {
-                            setFieldErrors(prev => ({
-                              ...prev,
-                              confirmPassword: false
-                            }));
+                          if (
+                            fieldErrors.confirmPassword
+                          ) {
+
+                            setFieldErrors(
+                              prev => ({
+                                ...prev,
+                                confirmPassword: false
+                              })
+                            );
+
                           }
 
                           setError(null);
@@ -1102,6 +1651,7 @@ const handleGoogleSignIn = async () => {
                         } rounded-xl py-2.5 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
                       />
 
+
                       <button
                         type="button"
                         onClick={() =>
@@ -1113,8 +1663,14 @@ const handleGoogleSignIn = async () => {
                       >
 
                         {showConfirmPassword
-                          ? <EyeOff className="h-4 w-4 text-slate-400" />
-                          : <Eye className="h-4 w-4 text-slate-400" />}
+
+                          ? (
+                            <EyeOff className="h-4 w-4 text-slate-400" />
+                          )
+
+                          : (
+                            <Eye className="h-4 w-4 text-slate-400" />
+                          )}
 
                       </button>
 
@@ -1126,23 +1682,31 @@ const handleGoogleSignIn = async () => {
 
               </div>
 
+
               {/* Research Disclosure */}
+
               <div className="text-[10px] text-slate-400 leading-normal font-sans py-1">
 
                 By processing your academic credentials, you acknowledge that all visual test metrics will be collected for evaluation of peer cognitive baselines under complete academic anonymity.
 
               </div>
 
+
               {/* Submit */}
+
               <button
                 type="submit"
-                disabled={isLoading || isSuccess}
+                disabled={
+                  isLoading ||
+                  isSuccess
+                }
                 className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center space-x-2 active:scale-98 disabled:opacity-50"
               >
 
                 {isLoading ? (
 
                   <>
+
                     <svg
                       className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
                       fill="none"
@@ -1161,7 +1725,7 @@ const handleGoogleSignIn = async () => {
                       <path
                         className="opacity-75"
                         fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.72 5.824 4.07 7.938l2.65-2.647z"
                       />
 
                     </svg>
@@ -1175,10 +1739,13 @@ const handleGoogleSignIn = async () => {
                 ) : (
 
                   <>
+
                     <span>
+
                       {isRegister
                         ? 'Generate Your Account'
                         : 'Authenticate Portal Access'}
+
                     </span>
 
                     <ArrowRight className="h-4 w-4" />
@@ -1191,7 +1758,11 @@ const handleGoogleSignIn = async () => {
 
             </form>
 
-            {/* Mode Switch */}
+
+            {/* ------------------------------------------------ */}
+            {/* MODE SWITCH */}
+            {/* ------------------------------------------------ */}
+
             <div className="text-center pt-4 text-xs font-sans text-slate-500">
 
               {isRegister ? (
@@ -1207,7 +1778,9 @@ const handleGoogleSignIn = async () => {
                     }
                     className="text-blue-600 hover:text-blue-700 font-bold underline transition-colors cursor-pointer bg-transparent border-none p-0"
                   >
+
                     Authenticate here
+
                   </button>
 
                 </span>
@@ -1225,7 +1798,9 @@ const handleGoogleSignIn = async () => {
                     }
                     className="text-blue-600 hover:text-blue-700 font-bold underline transition-colors cursor-pointer bg-transparent border-none p-0"
                   >
+
                     Register here
+
                   </button>
 
                 </span>
@@ -1241,5 +1816,7 @@ const handleGoogleSignIn = async () => {
       </div>
 
     </div>
+
   );
+
 }
