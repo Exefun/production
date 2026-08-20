@@ -12,6 +12,9 @@ import {
   AlertCircle,
   Save,
   Loader2,
+  MessageSquare,
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
 
 import { ActiveTab } from '../types';
@@ -52,6 +55,18 @@ interface ProfileForm {
   backgroundInformation: string;
 }
 
+interface SupportTicket {
+  id: number;
+  ticketId: string;
+  fullName: string;
+  email: string;
+  category: string;
+  affiliation: string | null;
+  message: string;
+  mstatus: number;
+  createdAt: string;
+}
+
 const emptyProfile: ProfileForm = {
   age: '',
   dob: '',
@@ -62,8 +77,13 @@ const emptyProfile: ProfileForm = {
 };
 
 export default function Dashboard({
+
   user,
+
+  setActiveTab,
+
   onLogout,
+
 }: DashboardProps) {
 
   const apiBaseUrl =
@@ -91,6 +111,19 @@ export default function Dashboard({
     useState<string | null>(null);
 
   // --------------------------------------------------
+  // SUPPORT TICKETS
+  // --------------------------------------------------
+
+  const [supportTickets, setSupportTickets] =
+    useState<SupportTicket[]>([]);
+
+  const [isTicketsLoading, setIsTicketsLoading] =
+    useState(true);
+
+  const [ticketsError, setTicketsError] =
+    useState<string | null>(null);
+
+  // --------------------------------------------------
   // LOAD USER PROFILE
   // --------------------------------------------------
 
@@ -99,11 +132,13 @@ export default function Dashboard({
     const loadProfile = async () => {
 
       if (!userId) {
+
         setError(
           'Unable to identify your account. Please sign in again.'
         );
 
         setIsLoading(false);
+
         return;
       }
 
@@ -119,17 +154,23 @@ export default function Dashboard({
         const data =
           await response.json();
 
-        if (!response.ok || !data.success) {
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+
           throw new Error(
             data.message ||
             'Unable to load your profile.'
           );
+
         }
 
         const profile: UserProfile =
           data.profile;
 
         setForm({
+
           age:
             profile.age !== null &&
             profile.age !== undefined
@@ -144,7 +185,9 @@ export default function Dashboard({
           yearsOfEducation:
             profile.yearsOfEducation !== null &&
             profile.yearsOfEducation !== undefined
-              ? String(profile.yearsOfEducation)
+              ? String(
+                  profile.yearsOfEducation
+                )
               : '',
 
           gender:
@@ -158,7 +201,9 @@ export default function Dashboard({
         });
 
         setProfileCompleted(
-          Boolean(profile.profileCompleted)
+          Boolean(
+            profile.profileCompleted
+          )
         );
 
       } catch (err: any) {
@@ -178,9 +223,85 @@ export default function Dashboard({
         setIsLoading(false);
 
       }
+
     };
 
     loadProfile();
+
+  }, [apiBaseUrl, userId]);
+
+  // --------------------------------------------------
+  // LOAD SUPPORT TICKETS
+  // --------------------------------------------------
+
+  const loadSupportTickets =
+    async () => {
+
+      if (!userId) {
+
+        setTicketsError(
+          'Unable to identify your account.'
+        );
+
+        setIsTicketsLoading(false);
+
+        return;
+      }
+
+      try {
+
+        setIsTicketsLoading(true);
+        setTicketsError(null);
+
+        const response =
+          await fetch(
+            `${apiBaseUrl}/usersupport/${userId}`
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+
+          throw new Error(
+            data.message ||
+            'Unable to load your support tickets.'
+          );
+
+        }
+
+        setSupportTickets(
+          Array.isArray(data.tickets)
+            ? data.tickets
+            : []
+        );
+
+      } catch (err: any) {
+
+        console.error(
+          'Support ticket loading error:',
+          err
+        );
+
+        setTicketsError(
+          err?.message ||
+          'Unable to load your support tickets.'
+        );
+
+      } finally {
+
+        setIsTicketsLoading(false);
+
+      }
+
+    };
+
+  useEffect(() => {
+
+    loadSupportTickets();
 
   }, [apiBaseUrl, userId]);
 
@@ -200,6 +321,7 @@ export default function Dashboard({
 
     setError(null);
     setSuccess(null);
+
   };
 
   // --------------------------------------------------
@@ -223,7 +345,9 @@ export default function Dashboard({
       age <= 0 ||
       age > 120
     ) {
+
       return 'Please enter a valid age.';
+
     }
 
     if (!form.dob) {
@@ -235,11 +359,15 @@ export default function Dashboard({
     }
 
     if (
-      !Number.isInteger(yearsOfEducation) ||
+      !Number.isInteger(
+        yearsOfEducation
+      ) ||
       yearsOfEducation < 0 ||
       yearsOfEducation > 100
     ) {
+
       return 'Please enter a valid number of years of education.';
+
     }
 
     if (!form.gender) {
@@ -274,14 +402,20 @@ export default function Dashboard({
       validateForm();
 
     if (validationError) {
-      setError(validationError);
+
+      setError(
+        validationError
+      );
+
       return;
     }
 
     if (!userId) {
+
       setError(
         'Unable to identify your account. Please sign in again.'
       );
+
       return;
     }
 
@@ -289,41 +423,60 @@ export default function Dashboard({
 
       setIsSaving(true);
 
-      const response = await fetch(
-        `${apiBaseUrl}/userprofile/${userId}`,
-        {
-          method: 'PUT',
+      const response =
+        await fetch(
+          `${apiBaseUrl}/userprofile/${userId}`,
+          {
+            method: 'PUT',
 
-          headers: {
-            'Content-Type': 'application/json',
-          },
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
 
-          body: JSON.stringify({
-            Age: Number(form.age),
-            DOB: form.dob,
-            YearsOfEducation:
-              Number(form.yearsOfEducation),
-            Gender: form.gender,
-            EducationLevel:
-              form.educationLevel,
-            BackgroundInformation:
-              form.backgroundInformation,
-          }),
-        }
-      );
+            body: JSON.stringify({
+              Age:
+                Number(form.age),
+
+              DOB:
+                form.dob,
+
+              YearsOfEducation:
+                Number(
+                  form.yearsOfEducation
+                ),
+
+              Gender:
+                form.gender,
+
+              EducationLevel:
+                form.educationLevel,
+
+              BackgroundInformation:
+                form.backgroundInformation,
+            }),
+          }
+        );
 
       const data =
         await response.json();
 
-      if (!response.ok || !data.success) {
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
         throw new Error(
           data.message ||
           'Unable to save your profile.'
         );
+
       }
 
       setProfileCompleted(
-        Boolean(data.profileCompleted)
+        Boolean(
+          data.profileCompleted
+        )
       );
 
       setSuccess(
@@ -347,7 +500,102 @@ export default function Dashboard({
       setIsSaving(false);
 
     }
+
   };
+
+  // --------------------------------------------------
+  // SUPPORT HELPERS
+  // --------------------------------------------------
+
+  const getCategoryLabel =
+    (category: string) => {
+
+      switch (category) {
+
+        case 'bug':
+          return 'Cognitive Module Bug';
+
+        case 'research':
+          return 'Academic Research Inquiry';
+
+        case 'collaboration':
+          return 'Institutional Collaboration';
+
+        case 'feedback':
+          return 'General Platform Feedback';
+
+        default:
+          return category;
+      }
+
+    };
+
+  const getStatusLabel =
+    (status: number) => {
+
+      if (Number(status) === 0) {
+        return 'Open';
+      }
+
+      if (Number(status) === 1) {
+        return 'Resolved';
+      }
+
+      return 'In Progress';
+
+    };
+
+  const getStatusClasses =
+    (status: number) => {
+
+      if (Number(status) === 0) {
+
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+
+      }
+
+      if (Number(status) === 1) {
+
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+      }
+
+      return 'bg-blue-50 text-blue-700 border-blue-200';
+
+    };
+
+  const formatTicketDate =
+    (dateValue: string) => {
+
+      if (!dateValue) {
+        return 'Unknown date';
+      }
+
+      const date =
+        new Date(dateValue);
+
+      if (
+        Number.isNaN(
+          date.getTime()
+        )
+      ) {
+
+        return dateValue;
+
+      }
+
+      return date.toLocaleString(
+        undefined,
+        {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        }
+      );
+
+    };
 
   // --------------------------------------------------
   // LOADING SCREEN
@@ -370,6 +618,7 @@ export default function Dashboard({
 
       </div>
     );
+
   }
 
   // --------------------------------------------------
@@ -382,9 +631,7 @@ export default function Dashboard({
 
       <div className="mx-auto max-w-5xl">
 
-        {/* ------------------------------------------------ */}
         {/* HEADER */}
-        {/* ------------------------------------------------ */}
 
         <div className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
 
@@ -414,16 +661,18 @@ export default function Dashboard({
 
           </div>
 
-          {/* User */}
           <div className="flex items-center gap-3">
 
             <div
               className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white ${
-                user.avatarColor || 'bg-blue-600'
+                user.avatarColor ||
+                'bg-blue-600'
               }`}
             >
               {user.avatarTag ||
-                user.name.charAt(0).toUpperCase()}
+                user.name
+                  .charAt(0)
+                  .toUpperCase()}
             </div>
 
             <div className="hidden sm:block">
@@ -442,9 +691,7 @@ export default function Dashboard({
 
         </div>
 
-        {/* ------------------------------------------------ */}
         {/* PROFILE STATUS */}
-        {/* ------------------------------------------------ */}
 
         <div
           className={`mb-6 rounded-2xl border p-5 ${
@@ -498,9 +745,7 @@ export default function Dashboard({
 
         </div>
 
-        {/* ------------------------------------------------ */}
         {/* ERROR */}
-        {/* ------------------------------------------------ */}
 
         {error && (
 
@@ -520,9 +765,7 @@ export default function Dashboard({
 
         )}
 
-        {/* ------------------------------------------------ */}
         {/* SUCCESS */}
-        {/* ------------------------------------------------ */}
 
         {success && (
 
@@ -542,16 +785,12 @@ export default function Dashboard({
 
         )}
 
-        {/* ------------------------------------------------ */}
         {/* PROFILE FORM */}
-        {/* ------------------------------------------------ */}
 
         <form
           onSubmit={handleSaveProfile}
           className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
         >
-
-          {/* Form Header */}
 
           <div className="mb-8">
 
@@ -578,8 +817,6 @@ export default function Dashboard({
             </div>
 
           </div>
-
-          {/* Fields */}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
 
@@ -796,7 +1033,9 @@ export default function Dashboard({
 
               <select
                 required
-                value={form.backgroundInformation}
+                value={
+                  form.backgroundInformation
+                }
                 onChange={(e) =>
                   handleChange(
                     'backgroundInformation',
@@ -844,8 +1083,6 @@ export default function Dashboard({
 
           </div>
 
-          {/* Required Notice */}
-
           <div className="mt-8 rounded-2xl bg-slate-50 p-4">
 
             <p className="text-xs leading-relaxed text-slate-500">
@@ -859,8 +1096,6 @@ export default function Dashboard({
             </p>
 
           </div>
-
-          {/* Save */}
 
           <div className="mt-8 flex justify-end">
 
@@ -893,8 +1128,224 @@ export default function Dashboard({
         </form>
 
         {/* ------------------------------------------------ */}
-        {/* SIGN OUT */}
+        {/* SUPPORT TICKETS */}
         {/* ------------------------------------------------ */}
+
+        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+            <div className="flex items-center gap-3">
+
+              <div className="rounded-xl bg-indigo-50 p-3">
+
+                <MessageSquare className="h-5 w-5 text-indigo-600" />
+
+              </div>
+
+              <div>
+
+                <h2 className="text-xl font-extrabold text-slate-900">
+                  My Support Tickets
+                </h2>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  View support requests submitted from your account.
+                </p>
+
+              </div>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={loadSupportTickets}
+              disabled={isTicketsLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  isTicketsLoading
+                    ? 'animate-spin'
+                    : ''
+                }`}
+              />
+
+              Refresh
+
+            </button>
+
+          </div>
+
+          {/* TICKETS ERROR */}
+
+          {ticketsError && (
+
+            <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+
+              <div className="flex items-start gap-3">
+
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+
+                <p className="text-sm text-red-700">
+                  {ticketsError}
+                </p>
+
+              </div>
+
+            </div>
+
+          )}
+
+          {/* TICKETS LOADING */}
+
+          {isTicketsLoading && !ticketsError && (
+
+            <div className="mt-8 flex flex-col items-center justify-center py-10">
+
+              <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                Loading your support tickets...
+              </p>
+
+            </div>
+
+          )}
+
+          {/* NO TICKETS */}
+
+          {!isTicketsLoading &&
+            !ticketsError &&
+            supportTickets.length === 0 && (
+
+              <div className="mt-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+
+                <MessageSquare className="mx-auto h-8 w-8 text-slate-300" />
+
+                <h3 className="mt-3 text-sm font-extrabold text-slate-700">
+                  No support tickets yet
+                </h3>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Your submitted support requests will appear here.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveTab('contact')
+                  }
+                  className="mt-5 inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-blue-700 active:scale-95"
+                >
+                  Contact Support
+                </button>
+
+              </div>
+
+            )}
+
+          {/* TICKETS */}
+
+          {!isTicketsLoading &&
+            !ticketsError &&
+            supportTickets.length > 0 && (
+
+              <div className="mt-6 space-y-4">
+
+                {supportTickets.map(
+                  ticket => (
+
+                    <div
+                      key={ticket.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-blue-200 hover:bg-white"
+                    >
+
+                      {/* TOP */}
+
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+
+                        <div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+
+                            <span className="font-mono text-xs font-extrabold tracking-wider text-indigo-600">
+                              {ticket.ticketId}
+                            </span>
+
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${getStatusClasses(
+                                ticket.mstatus
+                              )}`}
+                            >
+                              {getStatusLabel(
+                                ticket.mstatus
+                              )}
+                            </span>
+
+                          </div>
+
+                          <h3 className="mt-2 text-sm font-extrabold text-slate-900">
+                            {getCategoryLabel(
+                              ticket.category
+                            )}
+                          </h3>
+
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+
+                          <Clock className="h-3.5 w-3.5" />
+
+                          {formatTicketDate(
+                            ticket.createdAt
+                          )}
+
+                        </div>
+
+                      </div>
+
+                      {/* MESSAGE */}
+
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+
+                        <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
+                          {ticket.message}
+                        </p>
+
+                      </div>
+
+                      {/* META */}
+
+                      <div className="mt-4 flex flex-col gap-2 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+
+                        <span>
+                          Email: {ticket.email}
+                        </span>
+
+                        {ticket.affiliation && (
+
+                          <span>
+                            Affiliation: {ticket.affiliation}
+                          </span>
+
+                        )}
+
+                      </div>
+
+                    </div>
+
+                  )
+                )}
+
+              </div>
+
+            )}
+
+        </div>
+
+        {/* SIGN OUT */}
 
         <div className="mt-8 flex justify-end">
 
