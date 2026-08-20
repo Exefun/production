@@ -169,7 +169,6 @@ export default function App() {
   >
     <Dashboard
       user={currentUser}
-      stats={stats}
       setActiveTab={handleSetActiveTab}
       onLogout={() => {
         setCurrentUser(null);
