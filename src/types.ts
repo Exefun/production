@@ -15,7 +15,19 @@ export interface UserStats {
   scoresHistory: GameScore[];
 }
 
-export type ActiveTab = 'home' | 'about' | 'how-it-works' | 'contact' | 'auth' | 'privacy' | 'terms' | 'science' | 'objectives' | 'process' | 'skills';
+export type ActiveTab =
+  | 'home'
+  | 'about'
+  | 'how-it-works'
+  | 'contact'
+  | 'auth'
+  | 'dashboard'
+  | 'privacy'
+  | 'terms'
+  | 'science'
+  | 'objectives'
+  | 'process'
+  | 'skills';
 
 export interface StroopCard {
   word: string;

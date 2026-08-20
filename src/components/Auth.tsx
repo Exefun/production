@@ -6,6 +6,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { ActiveTab } from '../types';
 
+
 interface AuthProps {
   onLogin: (user: {
     name: string;
