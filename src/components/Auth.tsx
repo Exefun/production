@@ -56,6 +56,19 @@ interface AuthProps {
 
 
 // --------------------------------------------------
+// AUTH FLOW TYPE
+// --------------------------------------------------
+
+type AuthFlow =
+  | 'login'
+  | 'register'
+  | 'forgot-password'
+  | 'forgot-success'
+  | 'reset-password'
+  | 'reset-success';
+
+
+// --------------------------------------------------
 // AUTH COMPONENT
 // --------------------------------------------------
 
@@ -65,9 +78,34 @@ export default function Auth({
   initialMode = 'login'
 }: AuthProps) {
 
+
+  // --------------------------------------------------
+  // AUTH MODE
+  // --------------------------------------------------
+
   const [isRegister, setIsRegister] =
     useState(
       initialMode === 'register'
+    );
+
+
+  // --------------------------------------------------
+  // PASSWORD RESET URL TOKEN
+  // --------------------------------------------------
+
+  const [resetToken, setResetToken] =
+    useState<string | null>(null);
+
+
+  // --------------------------------------------------
+  // AUTH FLOW
+  // --------------------------------------------------
+
+  const [authFlow, setAuthFlow] =
+    useState<AuthFlow>(
+      initialMode === 'register'
+        ? 'register'
+        : 'login'
     );
 
 
@@ -90,9 +128,51 @@ export default function Auth({
 
     return () => {
 
-      document.head.removeChild(script);
+      if (
+        document.head.contains(script)
+      ) {
+
+        document.head.removeChild(script);
+
+      }
 
     };
+
+  }, []);
+
+
+  // --------------------------------------------------
+  // DETECT PASSWORD RESET URL
+  // --------------------------------------------------
+
+  useEffect(() => {
+
+    const path =
+      window.location.pathname;
+
+
+    const match =
+      path.match(
+        /^\/reset-password\/([^/]+)\/?$/
+      );
+
+
+    if (match?.[1]) {
+
+      const token =
+        decodeURIComponent(
+          match[1]
+        );
+
+      setResetToken(token);
+
+      setAuthFlow(
+        'reset-password'
+      );
+
+      setIsRegister(false);
+
+    }
 
   }, []);
 
@@ -103,11 +183,32 @@ export default function Auth({
 
   useEffect(() => {
 
-    setIsRegister(
-      initialMode === 'register'
-    );
+    if (
+      resetToken
+    ) {
 
-  }, [initialMode]);
+      return;
+
+    }
+
+    if (
+      initialMode === 'register'
+    ) {
+
+      setIsRegister(true);
+      setAuthFlow('register');
+
+    } else {
+
+      setIsRegister(false);
+      setAuthFlow('login');
+
+    }
+
+  }, [
+    initialMode,
+    resetToken
+  ]);
 
 
   // --------------------------------------------------
@@ -183,7 +284,9 @@ export default function Auth({
     const emailRegex =
       /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-    return emailRegex.test(emailStr);
+    return emailRegex.test(
+      emailStr
+    );
 
   };
 
@@ -204,14 +307,6 @@ export default function Auth({
   // PERSIST AUTHENTICATED USER
   // --------------------------------------------------
 
-  /**
-   * Saves the user object locally so that App.tsx can
-   * restore the authenticated dashboard after a browser
-   * refresh.
-   *
-   * This does NOT replace the authentication token.
-   * The token remains the actual authentication credential.
-   */
   const persistAuthenticatedUser = (
     user: AuthUser
   ) => {
@@ -282,7 +377,9 @@ export default function Auth({
     // VALIDATION ERROR
     // ------------------------------------------
 
-    if (Object.keys(errors).length > 0) {
+    if (
+      Object.keys(errors).length > 0
+    ) {
 
       setFieldErrors(errors);
 
@@ -295,19 +392,25 @@ export default function Auth({
           'Passwords do not match.'
         );
 
-      } else if (errors.contactNumber) {
+      } else if (
+        errors.contactNumber
+      ) {
 
         setError(
           'Please enter a valid 10-digit contact number.'
         );
 
-      } else if (errors.email) {
+      } else if (
+        errors.email
+      ) {
 
         setError(
           'Please enter a valid email address.'
         );
 
-      } else if (errors.password) {
+      } else if (
+        errors.password
+      ) {
 
         setError(
           'Password must contain at least 8 characters.'
@@ -452,9 +555,6 @@ export default function Auth({
       setIsSuccess(true);
 
 
-      // Give the success animation a moment
-      // to display before navigating.
-
       setTimeout(() => {
 
         onLogin(
@@ -500,16 +600,26 @@ export default function Auth({
     // VALIDATION
     // ------------------------------------------
 
-    if (!validateEmail(email.trim())) {
+    if (
+      !validateEmail(
+        email.trim()
+      )
+    ) {
+
       errors.email = true;
+
     }
 
     if (!password) {
+
       errors.password = true;
+
     }
 
 
-    if (Object.keys(errors).length > 0) {
+    if (
+      Object.keys(errors).length > 0
+    ) {
 
       setFieldErrors(errors);
 
@@ -688,6 +798,297 @@ export default function Auth({
 
 
   // --------------------------------------------------
+  // HANDLE FORGOT PASSWORD
+  // --------------------------------------------------
+
+  const handleForgotPassword = async () => {
+
+    clearErrors();
+
+
+    // ------------------------------------------
+    // VALIDATION
+    // ------------------------------------------
+
+    if (
+      !validateEmail(
+        email.trim()
+      )
+    ) {
+
+      setFieldErrors({
+        email: true
+      });
+
+      setError(
+        'Please enter a valid email address.'
+      );
+
+      return;
+
+    }
+
+
+    // ------------------------------------------
+    // API REQUEST
+    // ------------------------------------------
+
+    try {
+
+      setIsLoading(true);
+
+
+      const response =
+        await fetch(
+          `${apiBaseUrl}/forgot-password`,
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body: JSON.stringify({
+              email:
+                email.trim().toLowerCase()
+            })
+          }
+        );
+
+
+      const data =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
+        throw new Error(
+          data.message ||
+          'Unable to process your password reset request.'
+        );
+
+      }
+
+
+      // ------------------------------------------
+      // SUCCESS
+      // ------------------------------------------
+
+      setAuthFlow(
+        'forgot-success'
+      );
+
+      setError(null);
+
+
+    } catch (err: any) {
+
+      console.error(
+        'Forgot password error:',
+        err
+      );
+
+      setError(
+        err?.message ||
+        'Unable to connect to the password recovery service.'
+      );
+
+
+    } finally {
+
+      setIsLoading(false);
+
+    }
+
+  };
+
+
+  // --------------------------------------------------
+  // HANDLE RESET PASSWORD
+  // --------------------------------------------------
+
+  const handleResetPassword = async () => {
+
+    clearErrors();
+
+
+    // ------------------------------------------
+    // TOKEN CHECK
+    // ------------------------------------------
+
+    if (!resetToken) {
+
+      setError(
+        'This password reset link is invalid or incomplete.'
+      );
+
+      return;
+
+    }
+
+
+    const errors:
+      typeof fieldErrors = {};
+
+
+    // ------------------------------------------
+    // VALIDATION
+    // ------------------------------------------
+
+    if (!password) {
+
+      errors.password = true;
+
+    } else if (
+      password.length < 8
+    ) {
+
+      errors.password = true;
+
+    }
+
+    if (!confirmPassword) {
+
+      errors.confirmPassword = true;
+
+    }
+
+    if (
+      password !== confirmPassword
+    ) {
+
+      errors.confirmPassword = true;
+
+    }
+
+
+    // ------------------------------------------
+    // VALIDATION ERROR
+    // ------------------------------------------
+
+    if (
+      Object.keys(errors).length > 0
+    ) {
+
+      setFieldErrors(errors);
+
+      if (
+        password !== confirmPassword
+      ) {
+
+        setError(
+          'Passwords do not match.'
+        );
+
+      } else {
+
+        setError(
+          'Password must contain at least 8 characters.'
+        );
+
+      }
+
+      return;
+
+    }
+
+
+    // ------------------------------------------
+    // API REQUEST
+    // ------------------------------------------
+
+    try {
+
+      setIsLoading(true);
+      setError(null);
+      setFieldErrors({});
+
+
+      const response =
+        await fetch(
+          `${apiBaseUrl}/reset-password`,
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body: JSON.stringify({
+
+              resetToken:
+
+                resetToken,
+
+              password:
+                password,
+
+              confirmPassword:
+                confirmPassword
+
+            })
+          }
+        );
+
+
+      const data =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+
+        throw new Error(
+          data.message ||
+          'Unable to reset your password.'
+        );
+
+      }
+
+
+      // ------------------------------------------
+      // SUCCESS
+      // ------------------------------------------
+
+      setAuthFlow(
+        'reset-success'
+      );
+
+      setPassword('');
+      setConfirmPassword('');
+      setError(null);
+
+
+    } catch (err: any) {
+
+      console.error(
+        'Reset password error:',
+        err
+      );
+
+      setError(
+        err?.message ||
+        'Unable to reset your password. The reset link may have expired.'
+      );
+
+
+    } finally {
+
+      setIsLoading(false);
+
+    }
+
+  };
+
+
+  // --------------------------------------------------
   // SUBMIT HANDLER
   // --------------------------------------------------
 
@@ -711,6 +1112,40 @@ export default function Auth({
     clearErrors();
 
 
+    // ------------------------------------------
+    // RESET PASSWORD
+    // ------------------------------------------
+
+    if (
+      authFlow === 'reset-password'
+    ) {
+
+      await handleResetPassword();
+
+      return;
+
+    }
+
+
+    // ------------------------------------------
+    // FORGOT PASSWORD
+    // ------------------------------------------
+
+    if (
+      authFlow === 'forgot-password'
+    ) {
+
+      await handleForgotPassword();
+
+      return;
+
+    }
+
+
+    // ------------------------------------------
+    // NORMAL AUTH
+    // ------------------------------------------
+
     if (isRegister) {
 
       await handleRegister();
@@ -727,12 +1162,6 @@ export default function Auth({
   // --------------------------------------------------
   // GOOGLE SIGN-IN
   // --------------------------------------------------
-
-  /**
-   * Google authentication is still verified server-side.
-   * The only addition here is persistence of the resulting
-   * authenticated user.
-   */
 
   const handleGoogleSignIn = async () => {
 
@@ -972,11 +1401,20 @@ export default function Auth({
 
     setIsRegister(register);
 
+    setAuthFlow(
+      register
+        ? 'register'
+        : 'login'
+    );
+
     setError(null);
     setFieldErrors({});
 
     setPassword('');
     setConfirmPassword('');
+
+    setShowPassword(false);
+    setShowConfirmPassword(false);
 
 
     if (!register) {
@@ -987,6 +1425,95 @@ export default function Auth({
     }
 
   };
+
+
+  // --------------------------------------------------
+  // RETURN TO LOGIN
+  // --------------------------------------------------
+
+  const returnToLogin = () => {
+
+    setAuthFlow('login');
+
+    setIsRegister(false);
+
+    setResetToken(null);
+
+    setError(null);
+    setFieldErrors({});
+
+    setPassword('');
+    setConfirmPassword('');
+
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+
+
+    /*
+     * If the user arrived through the password-reset URL,
+     * replace the browser URL so refreshing does not keep
+     * reopening the reset screen.
+     */
+    if (
+      window.location.pathname.startsWith(
+        '/reset-password/'
+      )
+    ) {
+
+      window.history.replaceState(
+        {},
+        document.title,
+        '/login'
+      );
+
+    }
+
+  };
+
+
+  // --------------------------------------------------
+  // OPEN FORGOT PASSWORD
+  // --------------------------------------------------
+
+  const openForgotPassword = () => {
+
+    setAuthFlow(
+      'forgot-password'
+    );
+
+    setIsRegister(false);
+
+    setError(null);
+    setFieldErrors({});
+
+    setPassword('');
+    setConfirmPassword('');
+
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+
+  };
+
+
+  // --------------------------------------------------
+  // RENDER HELPERS
+  // --------------------------------------------------
+
+  const isRecoveryFlow =
+    authFlow === 'forgot-password' ||
+    authFlow === 'forgot-success' ||
+    authFlow === 'reset-password' ||
+    authFlow === 'reset-success';
+
+
+  const showGoogle =
+    authFlow === 'login' ||
+    authFlow === 'register';
+
+
+  const showNormalForm =
+    authFlow === 'login' ||
+    authFlow === 'register';
 
 
   // --------------------------------------------------
@@ -1033,9 +1560,15 @@ export default function Auth({
 
             <span className="text-indigo-600 font-extrabold">
 
-              {isRegister
+              {authFlow === 'register'
                 ? 'REGISTRATION'
-                : 'PORTAL SIGN IN'}
+                : authFlow === 'forgot-password' ||
+                  authFlow === 'forgot-success'
+                  ? 'PASSWORD RECOVERY'
+                  : authFlow === 'reset-password' ||
+                    authFlow === 'reset-success'
+                    ? 'PASSWORD RESET'
+                    : 'PORTAL SIGN IN'}
 
             </span>
 
@@ -1061,7 +1594,7 @@ export default function Auth({
 
 
         {/* ------------------------------------------------ */}
-        {/* SUCCESS SCREEN OVERLAY */}
+        {/* NORMAL AUTH SUCCESS SCREEN */}
         {/* ------------------------------------------------ */}
 
         <AnimatePresence>
@@ -1131,291 +1664,76 @@ export default function Auth({
         <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
 
 
-          {/* Header */}
+          {/* ------------------------------------------------ */}
+          {/* RECOVERY / RESET SUCCESS */}
+          {/* ------------------------------------------------ */}
 
-          <div className="text-center space-y-3 mb-8">
+          {(authFlow === 'forgot-success' ||
+            authFlow === 'reset-success') && (
 
-            <div className="inline-flex items-center justify-center space-x-2">
+            <div className="text-center">
 
-              <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-2.5 rounded-xl">
+              <div className="inline-flex items-center justify-center space-x-2 mb-6">
 
-                <Brain className="h-5 w-5 text-white" />
+                <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-2.5 rounded-xl">
+
+                  <Brain className="h-5 w-5 text-white" />
+
+                </div>
+
+                <span className="text-xl font-sans font-extrabold tracking-tight text-slate-900">
+
+                  Exe<span className="text-blue-600">
+                    fun
+                  </span>
+
+                </span>
 
               </div>
 
-              <span className="text-xl font-sans font-extrabold tracking-tight text-slate-900">
 
-                Exe<span className="text-blue-600">
-                  fun
-                </span>
+              <div className="h-16 w-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
 
-              </span>
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
 
-            </div>
+              </div>
 
-
-            <div>
 
               <h2 className="text-xl sm:text-2xl font-sans font-extrabold text-slate-900 tracking-tight">
 
-                {isRegister
-                  ? 'Create Your Account'
-                  : 'Portal Sign In'}
+                {authFlow === 'forgot-success'
+                  ? 'Reset Link Sent'
+                  : 'Password Reset Successful'}
 
               </h2>
 
 
-              <p className="text-slate-500 text-xs sm:text-sm font-sans mt-1">
+              <p className="text-slate-500 text-xs sm:text-sm font-sans mt-2 leading-relaxed max-w-sm mx-auto">
 
-                {isRegister
-                  ? 'Register now to calibrate your Executive Functioning skills'
-                  : 'Access your saved baseline metrics & training games'}
+                {authFlow === 'forgot-success'
+                  ? 'We have sent a password reset link to your registered email address. Please check your inbox and SPAM folder.'
+                  : 'Your Exefun account password has been reset successfully. You can now sign in using your new password.'}
 
               </p>
 
-            </div>
 
-          </div>
+              {authFlow === 'forgot-success' && (
 
+                <div className="mt-6 p-3.5 bg-blue-50 border border-blue-100 rounded-xl text-left">
 
-          {/* ------------------------------------------------ */}
-          {/* GOOGLE BUTTON */}
-          {/* ------------------------------------------------ */}
+                  <div className="flex items-start space-x-2.5">
 
-          <div className="space-y-4">
+                    <Mail className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
 
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center space-x-3 py-3 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-xs sm:text-sm font-bold transition-all border border-slate-200 shadow-sm cursor-pointer group active:scale-95 disabled:opacity-50"
-            >
+                    <p className="text-[11px] text-blue-700 leading-relaxed">
 
-              <svg
-                className="h-5 w-5 group-hover:scale-105 transition-transform"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
+                      The reset link is valid for
+                      <strong> 30 minutes</strong>.
+                      If you don't see the email,
+                      please check your SPAM or
+                      JUNK folder.
 
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  fill="#4285F4"
-                />
-
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  fill="#FBBC05"
-                />
-
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  fill="#EA4335"
-                />
-
-              </svg>
-
-
-              <span>
-
-                {isRegister
-                  ? 'Register with Google'
-                  : 'Sign in with Google'}
-
-              </span>
-
-            </button>
-
-
-            {/* Divider */}
-
-            <div className="relative flex py-2 items-center">
-
-              <div className="flex-grow border-t border-slate-200" />
-
-              <span className="flex-shrink mx-4 text-[10px] font-mono uppercase text-slate-400 tracking-widest bg-white px-2">
-
-                or continue with email
-
-              </span>
-
-              <div className="flex-grow border-t border-slate-200" />
-
-            </div>
-
-
-            {/* Error */}
-
-            {error && (
-
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: -8
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0
-                }}
-                className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-2.5 text-left text-xs text-red-600"
-              >
-
-                <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-
-                <span className="font-sans leading-relaxed">
-                  {error}
-                </span>
-
-              </motion.div>
-
-            )}
-
-
-            {/* ------------------------------------------------ */}
-            {/* FORM */}
-            {/* ------------------------------------------------ */}
-
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-4 text-left"
-            >
-
-
-              {/* Registration fields */}
-
-              {isRegister && (
-
-                <div className="grid grid-cols-1 gap-4">
-
-
-                  {/* Full Name */}
-
-                  <div className="space-y-1.5">
-
-                    <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
-
-                      Full Name
-
-                    </label>
-
-
-                    <div className="relative">
-
-                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-
-                        <User className="h-4 w-4" />
-
-                      </div>
-
-
-                      <input
-                        type="text"
-                        required
-                        value={fullName}
-                        onChange={(e) => {
-
-                          setFullName(
-                            e.target.value
-                          );
-
-                          if (
-                            fieldErrors.fullName
-                          ) {
-
-                            setFieldErrors(
-                              prev => ({
-                                ...prev,
-                                fullName: false
-                              })
-                            );
-
-                          }
-
-                          setError(null);
-
-                        }}
-                        placeholder="Aarav Sharma"
-                        className={`w-full bg-slate-50 border ${
-                          fieldErrors.fullName
-                            ? 'border-red-500 bg-red-50/20 focus:border-red-500'
-                            : 'border-slate-200 focus:border-blue-500'
-                        } rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
-                      />
-
-                    </div>
-
-                  </div>
-
-
-                  {/* Contact Number */}
-
-                  <div className="space-y-1.5">
-
-                    <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
-
-                      Contact Number{' '}
-
-                      <span className="text-slate-400 font-medium">
-                        (10 digits)
-                      </span>
-
-                    </label>
-
-
-                    <div className="relative">
-
-                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-
-                        <Phone className="h-4 w-4" />
-
-                      </div>
-
-
-                      <input
-                        type="tel"
-                        required
-                        inputMode="numeric"
-                        value={contactNumber}
-                        onChange={(e) => {
-
-                          const cleaned =
-                            e.target.value
-                              .replace(/\D/g, '')
-                              .slice(0, 10);
-
-                          setContactNumber(
-                            cleaned
-                          );
-
-                          if (
-                            fieldErrors.contactNumber
-                          ) {
-
-                            setFieldErrors(
-                              prev => ({
-                                ...prev,
-                                contactNumber: false
-                              })
-                            );
-
-                          }
-
-                          setError(null);
-
-                        }}
-                        placeholder="9876543210"
-                        className={`w-full bg-slate-50 border ${
-                          fieldErrors.contactNumber
-                            ? 'border-red-500 bg-red-50/20 focus:border-red-500'
-                            : 'border-slate-200 focus:border-blue-500'
-                        } rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
-                      />
-
-                    </div>
+                    </p>
 
                   </div>
 
@@ -1423,6 +1741,203 @@ export default function Auth({
 
               )}
 
+
+              <button
+                type="button"
+                onClick={returnToLogin}
+                className="w-full mt-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center space-x-2 active:scale-98"
+              >
+
+                <ArrowLeft className="h-4 w-4" />
+
+                <span>
+                  Return to Sign In
+                </span>
+
+              </button>
+
+            </div>
+
+          )}
+
+
+          {/* ------------------------------------------------ */}
+          {/* HEADER */}
+          {/* ------------------------------------------------ */}
+
+          {authFlow !== 'forgot-success' &&
+            authFlow !== 'reset-success' && (
+
+            <div className="text-center space-y-3 mb-8">
+
+              <div className="inline-flex items-center justify-center space-x-2">
+
+                <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-2.5 rounded-xl">
+
+                  <Brain className="h-5 w-5 text-white" />
+
+                </div>
+
+                <span className="text-xl font-sans font-extrabold tracking-tight text-slate-900">
+
+                  Exe<span className="text-blue-600">
+                    fun
+                  </span>
+
+                </span>
+
+              </div>
+
+
+              <div>
+
+                <h2 className="text-xl sm:text-2xl font-sans font-extrabold text-slate-900 tracking-tight">
+
+                  {authFlow === 'register'
+                    ? 'Create Your Account'
+                    : authFlow === 'forgot-password'
+                      ? 'Password Recovery'
+                      : authFlow === 'reset-password'
+                        ? 'Reset Your Password'
+                        : 'Portal Sign In'}
+
+                </h2>
+
+
+                <p className="text-slate-500 text-xs sm:text-sm font-sans mt-1">
+
+                  {authFlow === 'register'
+                    ? 'Register now to calibrate your Executive Functioning skills'
+                    : authFlow === 'forgot-password'
+                      ? 'Enter your registered email address to receive a secure password reset link.'
+                      : authFlow === 'reset-password'
+                        ? 'Create a new password for your Exefun account.'
+                        : 'Access your saved baseline metrics & training games'}
+
+                </p>
+
+              </div>
+
+            </div>
+
+          )}
+
+
+          {/* ------------------------------------------------ */}
+          {/* GOOGLE BUTTON */}
+          {/* ------------------------------------------------ */}
+
+          {showGoogle && (
+
+            <div className="space-y-4">
+
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                className="w-full flex items-center justify-center space-x-3 py-3 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-xs sm:text-sm font-bold transition-all border border-slate-200 shadow-sm cursor-pointer group active:scale-95 disabled:opacity-50"
+              >
+
+                <svg
+                  className="h-5 w-5 group-hover:scale-105 transition-transform"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+
+                  <path
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    fill="#4285F4"
+                  />
+
+                  <path
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    fill="#34A853"
+                  />
+
+                  <path
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    fill="#FBBC05"
+                  />
+
+                  <path
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    fill="#EA4335"
+                  />
+
+                </svg>
+
+
+                <span>
+
+                  {isRegister
+                    ? 'Register with Google'
+                    : 'Sign in with Google'}
+
+                </span>
+
+              </button>
+
+
+              {/* Divider */}
+
+              <div className="relative flex py-2 items-center">
+
+                <div className="flex-grow border-t border-slate-200" />
+
+                <span className="flex-shrink mx-4 text-[10px] font-mono uppercase text-slate-400 tracking-widest bg-white px-2">
+
+                  or continue with email
+
+                </span>
+
+                <div className="flex-grow border-t border-slate-200" />
+
+              </div>
+
+            </div>
+
+          )}
+
+
+          {/* ------------------------------------------------ */}
+          {/* ERROR */}
+          {/* ------------------------------------------------ */}
+
+          {error && (
+
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: -8
+              }}
+              animate={{
+                opacity: 1,
+                y: 0
+              }}
+              className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-2.5 text-left text-xs text-red-600 mb-4"
+            >
+
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+
+              <span className="font-sans leading-relaxed">
+                {error}
+              </span>
+
+            </motion.div>
+
+          )}
+
+
+          {/* ------------------------------------------------ */}
+          {/* FORGOT PASSWORD FORM */}
+          {/* ------------------------------------------------ */}
+
+          {authFlow === 'forgot-password' && (
+
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 text-left"
+            >
 
               {/* Email */}
 
@@ -1446,6 +1961,7 @@ export default function Auth({
 
                   <input
                     type="email"
+                    autoComplete="email"
                     required
                     value={email}
                     onChange={(e) => {
@@ -1475,7 +1991,7 @@ export default function Auth({
                       fieldErrors.email
                         ? 'border-red-500 bg-red-50/20 focus:border-red-500'
                         : 'border-slate-200 focus:border-blue-500'
-                    } rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                    } rounded-xl py-3 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
                   />
 
                 </div>
@@ -1483,211 +1999,16 @@ export default function Auth({
               </div>
 
 
-              {/* Password Fields */}
+              <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-xl">
 
-              <div
-                className={
-                  isRegister
-                    ? 'grid grid-cols-1 sm:grid-cols-2 gap-4'
-                    : 'space-y-1.5'
-                }
-              >
+                <p className="text-[10px] text-blue-700 leading-relaxed font-sans">
 
+                  Enter the email address you used
+                  when registering your Exefun account.
+                  We will send you a secure password
+                  reset link.
 
-                {/* Password */}
-
-                <div className="space-y-1.5">
-
-                  <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
-
-                    Password
-
-                  </label>
-
-
-                  <div className="relative">
-
-                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-
-                      <Lock className="h-4 w-4" />
-
-                    </div>
-
-
-                    <input
-                      type={
-                        showPassword
-                          ? 'text'
-                          : 'password'
-                      }
-                      required
-                      value={password}
-                      onChange={(e) => {
-
-                        setPassword(
-                          e.target.value
-                        );
-
-                        if (
-                          fieldErrors.password
-                        ) {
-
-                          setFieldErrors(
-                            prev => ({
-                              ...prev,
-                              password: false
-                            })
-                          );
-
-                        }
-
-                        setError(null);
-
-                      }}
-                      placeholder="••••••••"
-                      className={`w-full bg-slate-50 border ${
-                        fieldErrors.password
-                          ? 'border-red-500 bg-red-50/20 focus:border-red-500'
-                          : 'border-slate-200 focus:border-blue-500'
-                      } rounded-xl py-2.5 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
-                    />
-
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setShowPassword(
-                          !showPassword
-                        )
-                      }
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
-                    >
-
-                      {showPassword
-
-                        ? (
-                          <EyeOff className="h-4 w-4 text-slate-400" />
-                        )
-
-                        : (
-                          <Eye className="h-4 w-4 text-slate-400" />
-                        )}
-
-                    </button>
-
-                  </div>
-
-
-                  {/* Password requirement */}
-
-                  {isRegister && (
-
-                    <p className="text-[9px] text-slate-400">
-                      Minimum 8 characters
-                    </p>
-
-                  )}
-
-                </div>
-
-
-                {/* Confirm Password */}
-
-                {isRegister && (
-
-                  <div className="space-y-1.5">
-
-                    <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
-
-                      Confirm Password
-
-                    </label>
-
-
-                    <div className="relative">
-
-                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-
-                        <Lock className="h-4 w-4" />
-
-                      </div>
-
-
-                      <input
-                        type={
-                          showConfirmPassword
-                            ? 'text'
-                            : 'password'
-                        }
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => {
-
-                          setConfirmPassword(
-                            e.target.value
-                          );
-
-                          if (
-                            fieldErrors.confirmPassword
-                          ) {
-
-                            setFieldErrors(
-                              prev => ({
-                                ...prev,
-                                confirmPassword: false
-                              })
-                            );
-
-                          }
-
-                          setError(null);
-
-                        }}
-                        placeholder="••••••••"
-                        className={`w-full bg-slate-50 border ${
-                          fieldErrors.confirmPassword
-                            ? 'border-red-500 bg-red-50/20 focus:border-red-500'
-                            : 'border-slate-200 focus:border-blue-500'
-                        } rounded-xl py-2.5 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
-                      />
-
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowConfirmPassword(
-                            !showConfirmPassword
-                          )
-                        }
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
-                      >
-
-                        {showConfirmPassword
-
-                          ? (
-                            <EyeOff className="h-4 w-4 text-slate-400" />
-                          )
-
-                          : (
-                            <Eye className="h-4 w-4 text-slate-400" />
-                          )}
-
-                      </button>
-
-                    </div>
-
-                  </div>
-
-                )}
-
-              </div>
-
-
-              {/* Research Disclosure */}
-
-              <div className="text-[10px] text-slate-400 leading-normal font-sans py-1">
-
-                By processing your academic credentials, you acknowledge that all visual test metrics will be collected for evaluation of peer cognitive baselines under complete academic anonymity.
+                </p>
 
               </div>
 
@@ -1696,10 +2017,7 @@ export default function Auth({
 
               <button
                 type="submit"
-                disabled={
-                  isLoading ||
-                  isSuccess
-                }
+                disabled={isLoading}
                 className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center space-x-2 active:scale-98 disabled:opacity-50"
               >
 
@@ -1731,7 +2049,7 @@ export default function Auth({
                     </svg>
 
                     <span>
-                      Verifying Credentials...
+                      Sending Reset Link...
                     </span>
 
                   </>
@@ -1741,11 +2059,7 @@ export default function Auth({
                   <>
 
                     <span>
-
-                      {isRegister
-                        ? 'Generate Your Account'
-                        : 'Authenticate Portal Access'}
-
+                      Send Reset Link
                     </span>
 
                     <ArrowRight className="h-4 w-4" />
@@ -1756,60 +2070,890 @@ export default function Auth({
 
               </button>
 
+
+              {/* Back */}
+
+              <div className="text-center pt-2">
+
+                <button
+                  type="button"
+                  onClick={returnToLogin}
+                  className="inline-flex items-center space-x-1.5 text-xs font-sans font-bold text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+                >
+
+                  <ArrowLeft className="h-3.5 w-3.5" />
+
+                  <span>
+                    Back to Sign In
+                  </span>
+
+                </button>
+
+              </div>
+
             </form>
 
+          )}
 
-            {/* ------------------------------------------------ */}
-            {/* MODE SWITCH */}
-            {/* ------------------------------------------------ */}
 
-            <div className="text-center pt-4 text-xs font-sans text-slate-500">
+          {/* ------------------------------------------------ */}
+          {/* RESET PASSWORD FORM */}
+          {/* ------------------------------------------------ */}
 
-              {isRegister ? (
+          {authFlow === 'reset-password' && (
 
-                <span>
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-4 text-left"
+            >
 
-                  Already registered?{' '}
+              {/* New Password */}
+
+              <div className="space-y-1.5">
+
+                <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
+                  New Password
+
+                </label>
+
+
+                <div className="relative">
+
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
+                    <Lock className="h-4 w-4" />
+
+                  </div>
+
+
+                  <input
+                    type={
+                      showPassword
+                        ? 'text'
+                        : 'password'
+                    }
+                    autoComplete="new-password"
+                    required
+                    value={password}
+                    onChange={(e) => {
+
+                      setPassword(
+                        e.target.value
+                      );
+
+                      if (
+                        fieldErrors.password
+                      ) {
+
+                        setFieldErrors(
+                          prev => ({
+                            ...prev,
+                            password: false
+                          })
+                        );
+
+                      }
+
+                      setError(null);
+
+                    }}
+                    placeholder="••••••••"
+                    className={`w-full bg-slate-50 border ${
+                      fieldErrors.password
+                        ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                        : 'border-slate-200 focus:border-blue-500'
+                    } rounded-xl py-3 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                  />
+
 
                   <button
                     type="button"
                     onClick={() =>
-                      switchMode(false)
+                      setShowPassword(
+                        !showPassword
+                      )
                     }
-                    className="text-blue-600 hover:text-blue-700 font-bold underline transition-colors cursor-pointer bg-transparent border-none p-0"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
                   >
 
-                    Authenticate here
+                    {showPassword
+
+                      ? (
+                        <EyeOff className="h-4 w-4" />
+                      )
+
+                      : (
+                        <Eye className="h-4 w-4" />
+                      )}
 
                   </button>
 
-                </span>
+                </div>
 
-              ) : (
 
-                <span>
+                <p className="text-[9px] text-slate-400">
 
-                  Need an academic study account?{' '}
+                  Minimum 8 characters
+
+                </p>
+
+              </div>
+
+
+              {/* Confirm Password */}
+
+              <div className="space-y-1.5">
+
+                <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
+                  Confirm New Password
+
+                </label>
+
+
+                <div className="relative">
+
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
+                    <Lock className="h-4 w-4" />
+
+                  </div>
+
+
+                  <input
+                    type={
+                      showConfirmPassword
+                        ? 'text'
+                        : 'password'
+                    }
+                    autoComplete="new-password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => {
+
+                      setConfirmPassword(
+                        e.target.value
+                      );
+
+                      if (
+                        fieldErrors.confirmPassword
+                      ) {
+
+                        setFieldErrors(
+                          prev => ({
+                            ...prev,
+                            confirmPassword: false
+                          })
+                        );
+
+                      }
+
+                      setError(null);
+
+                    }}
+                    placeholder="••••••••"
+                    className={`w-full bg-slate-50 border ${
+                      fieldErrors.confirmPassword
+                        ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                        : 'border-slate-200 focus:border-blue-500'
+                    } rounded-xl py-3 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                  />
+
 
                   <button
                     type="button"
                     onClick={() =>
-                      switchMode(true)
+                      setShowConfirmPassword(
+                        !showConfirmPassword
+                      )
                     }
-                    className="text-blue-600 hover:text-blue-700 font-bold underline transition-colors cursor-pointer bg-transparent border-none p-0"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
                   >
 
-                    Register here
+                    {showConfirmPassword
+
+                      ? (
+                        <EyeOff className="h-4 w-4" />
+                      )
+
+                      : (
+                        <Eye className="h-4 w-4" />
+                      )}
 
                   </button>
 
-                </span>
+                </div>
 
-              )}
+              </div>
 
-            </div>
 
-          </div>
+              {/* Security note */}
+
+              <div className="p-3.5 bg-blue-50 border border-blue-100 rounded-xl">
+
+                <p className="text-[10px] text-blue-700 leading-relaxed font-sans">
+
+                  Your reset link is valid for
+                  <strong> 30 minutes</strong>.
+                  For security, choose a password
+                  that is at least 8 characters long.
+
+                </p>
+
+              </div>
+
+
+              {/* Submit */}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center space-x-2 active:scale-98 disabled:opacity-50"
+              >
+
+                {isLoading ? (
+
+                  <>
+
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.72 5.824 4.07 7.938l2.65-2.647z"
+                      />
+
+                    </svg>
+
+                    <span>
+                      Resetting Password...
+                    </span>
+
+                  </>
+
+                ) : (
+
+                  <>
+
+                    <span>
+                      Reset Password
+                    </span>
+
+                    <ArrowRight className="h-4 w-4" />
+
+                  </>
+
+                )}
+
+              </button>
+
+
+              {/* Back */}
+
+              <div className="text-center pt-2">
+
+                <button
+                  type="button"
+                  onClick={returnToLogin}
+                  className="inline-flex items-center space-x-1.5 text-xs font-sans font-bold text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+                >
+
+                  <ArrowLeft className="h-3.5 w-3.5" />
+
+                  <span>
+                    Back to Sign In
+                  </span>
+
+                </button>
+
+              </div>
+
+            </form>
+
+          )}
+
+
+          {/* ------------------------------------------------ */}
+          {/* NORMAL LOGIN / REGISTRATION */}
+          {/* ------------------------------------------------ */}
+
+          {showNormalForm && (
+
+            <>
+
+              {/* ------------------------------------------------ */}
+              {/* FORM */}
+              {/* ------------------------------------------------ */}
+
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4 text-left"
+              >
+
+
+                {/* Registration fields */}
+
+                {isRegister && (
+
+                  <div className="grid grid-cols-1 gap-4">
+
+
+                    {/* Full Name */}
+
+                    <div className="space-y-1.5">
+
+                      <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
+                        Full Name
+
+                      </label>
+
+
+                      <div className="relative">
+
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
+                          <User className="h-4 w-4" />
+
+                        </div>
+
+
+                        <input
+                          type="text"
+                          required
+                          value={fullName}
+                          onChange={(e) => {
+
+                            setFullName(
+                              e.target.value
+                            );
+
+                            if (
+                              fieldErrors.fullName
+                            ) {
+
+                              setFieldErrors(
+                                prev => ({
+                                  ...prev,
+                                  fullName: false
+                                })
+                              );
+
+                            }
+
+                            setError(null);
+
+                          }}
+                          placeholder="Aarav Sharma"
+                          className={`w-full bg-slate-50 border ${
+                            fieldErrors.fullName
+                              ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                              : 'border-slate-200 focus:border-blue-500'
+                          } rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                        />
+
+                      </div>
+
+                    </div>
+
+
+                    {/* Contact Number */}
+
+                    <div className="space-y-1.5">
+
+                      <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
+                        Contact Number{' '}
+
+                        <span className="text-slate-400 font-medium">
+                          (10 digits)
+                        </span>
+
+                      </label>
+
+
+                      <div className="relative">
+
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
+                          <Phone className="h-4 w-4" />
+
+                        </div>
+
+
+                        <input
+                          type="tel"
+                          required
+                          inputMode="numeric"
+                          value={contactNumber}
+                          onChange={(e) => {
+
+                            const cleaned =
+                              e.target.value
+                                .replace(/\D/g, '')
+                                .slice(0, 10);
+
+                            setContactNumber(
+                              cleaned
+                            );
+
+                            if (
+                              fieldErrors.contactNumber
+                            ) {
+
+                              setFieldErrors(
+                                prev => ({
+                                  ...prev,
+                                  contactNumber: false
+                                })
+                              );
+
+                            }
+
+                            setError(null);
+
+                          }}
+                          placeholder="9876543210"
+                          className={`w-full bg-slate-50 border ${
+                            fieldErrors.contactNumber
+                              ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                              : 'border-slate-200 focus:border-blue-500'
+                          } rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                        />
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                )}
+
+
+                {/* Email */}
+
+                <div className="space-y-1.5">
+
+                  <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
+                    Email Address
+
+                  </label>
+
+
+                  <div className="relative">
+
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
+                      <Mail className="h-4 w-4" />
+
+                    </div>
+
+
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => {
+
+                        setEmail(
+                          e.target.value
+                        );
+
+                        if (
+                          fieldErrors.email
+                        ) {
+
+                          setFieldErrors(
+                            prev => ({
+                              ...prev,
+                              email: false
+                            })
+                          );
+
+                        }
+
+                        setError(null);
+
+                      }}
+                      placeholder="myemailaddress@gmail.com"
+                      className={`w-full bg-slate-50 border ${
+                        fieldErrors.email
+                          ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                          : 'border-slate-200 focus:border-blue-500'
+                      } rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                    />
+
+                  </div>
+
+                </div>
+
+
+                {/* Password Fields */}
+
+                <div
+                  className={
+                    isRegister
+                      ? 'grid grid-cols-1 sm:grid-cols-2 gap-4'
+                      : 'space-y-1.5'
+                  }
+                >
+
+
+                  {/* Password */}
+
+                  <div className="space-y-1.5">
+
+                    <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
+                      Password
+
+                    </label>
+
+
+                    <div className="relative">
+
+                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
+                        <Lock className="h-4 w-4" />
+
+                      </div>
+
+
+                      <input
+                        type={
+                          showPassword
+                            ? 'text'
+                            : 'password'
+                        }
+                        required
+                        value={password}
+                        onChange={(e) => {
+
+                          setPassword(
+                            e.target.value
+                          );
+
+                          if (
+                            fieldErrors.password
+                          ) {
+
+                            setFieldErrors(
+                              prev => ({
+                                ...prev,
+                                password: false
+                              })
+                            );
+
+                          }
+
+                          setError(null);
+
+                        }}
+                        placeholder="••••••••"
+                        className={`w-full bg-slate-50 border ${
+                          fieldErrors.password
+                            ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                            : 'border-slate-200 focus:border-blue-500'
+                        } rounded-xl py-2.5 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                      />
+
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPassword(
+                            !showPassword
+                          )
+                        }
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
+                      >
+
+                        {showPassword
+
+                          ? (
+                            <EyeOff className="h-4 w-4 text-slate-400" />
+                          )
+
+                          : (
+                            <Eye className="h-4 w-4 text-slate-400" />
+                          )}
+
+                      </button>
+
+                    </div>
+
+
+                    {/* Password requirement */}
+
+                    {isRegister && (
+
+                      <p className="text-[9px] text-slate-400">
+                        Minimum 8 characters
+                      </p>
+
+                    )}
+
+                  </div>
+
+
+                  {/* Confirm Password */}
+
+                  {isRegister && (
+
+                    <div className="space-y-1.5">
+
+                      <label className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">
+
+                        Confirm Password
+
+                      </label>
+
+
+                      <div className="relative">
+
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+
+                          <Lock className="h-4 w-4" />
+
+                        </div>
+
+
+                        <input
+                          type={
+                            showConfirmPassword
+                              ? 'text'
+                              : 'password'
+                          }
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => {
+
+                            setConfirmPassword(
+                              e.target.value
+                            );
+
+                            if (
+                              fieldErrors.confirmPassword
+                            ) {
+
+                              setFieldErrors(
+                                prev => ({
+                                  ...prev,
+                                  confirmPassword: false
+                                })
+                              );
+
+                            }
+
+                            setError(null);
+
+                          }}
+                          placeholder="••••••••"
+                          className={`w-full bg-slate-50 border ${
+                            fieldErrors.confirmPassword
+                              ? 'border-red-500 bg-red-50/20 focus:border-red-500'
+                              : 'border-slate-200 focus:border-blue-500'
+                          } rounded-xl py-2.5 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white transition-all font-sans`}
+                        />
+
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowConfirmPassword(
+                              !showConfirmPassword
+                            )
+                          }
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
+                        >
+
+                          {showConfirmPassword
+
+                            ? (
+                              <EyeOff className="h-4 w-4 text-slate-400" />
+                            )
+
+                            : (
+                              <Eye className="h-4 w-4 text-slate-400" />
+                            )}
+
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  )}
+
+                </div>
+
+
+                {/* Forgot Password */}
+
+                {!isRegister && (
+
+                  <div className="flex justify-end -mt-1">
+
+                    <button
+                      type="button"
+                      onClick={openForgotPassword}
+                      disabled={isLoading}
+                      className="text-[10px] sm:text-xs font-sans font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors cursor-pointer disabled:opacity-50"
+                    >
+
+                      Forgot your password?
+
+                    </button>
+
+                  </div>
+
+                )}
+
+
+                {/* Research Disclosure */}
+
+                <div className="text-[10px] text-slate-400 leading-normal font-sans py-1">
+
+                  By processing your academic credentials, you acknowledge that all visual test metrics will be collected for evaluation of peer cognitive baselines under complete academic anonymity.
+
+                </div>
+
+
+                {/* Submit */}
+
+                <button
+                  type="submit"
+                  disabled={
+                    isLoading ||
+                    isSuccess
+                  }
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 flex items-center justify-center space-x-2 active:scale-98 disabled:opacity-50"
+                >
+
+                  {isLoading ? (
+
+                    <>
+
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.72 5.824 4.07 7.938l2.65-2.647z"
+                        />
+
+                      </svg>
+
+                      <span>
+                        Verifying Credentials...
+                      </span>
+
+                    </>
+
+                  ) : (
+
+                    <>
+
+                      <span>
+
+                        {isRegister
+                          ? 'Generate Your Account'
+                          : 'Authenticate Portal Access'}
+
+                      </span>
+
+                      <ArrowRight className="h-4 w-4" />
+
+                    </>
+
+                  )}
+
+                </button>
+
+              </form>
+
+
+              {/* ------------------------------------------------ */}
+              {/* MODE SWITCH */}
+              {/* ------------------------------------------------ */}
+
+              <div className="text-center pt-4 text-xs font-sans text-slate-500">
+
+                {isRegister ? (
+
+                  <span>
+
+                    Already registered?{' '}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        switchMode(false)
+                      }
+                      className="text-blue-600 hover:text-blue-700 font-bold underline transition-colors cursor-pointer bg-transparent border-none p-0"
+                    >
+
+                      Authenticate here
+
+                    </button>
+
+                  </span>
+
+                ) : (
+
+                  <span>
+
+                    Need an academic study account?{' '}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        switchMode(true)
+                      }
+                      className="text-blue-600 hover:text-blue-700 font-bold underline transition-colors cursor-pointer bg-transparent border-none p-0"
+                    >
+
+                      Register here
+
+                    </button>
+
+                  </span>
+
+                )}
+
+              </div>
+
+            </>
+
+          )}
 
         </div>
 

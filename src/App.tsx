@@ -14,6 +14,7 @@ import Features from './components/Features';
 import Footer from './components/Footer';
 import TestimonialsAndFaq from './components/TestimonialsAndFaq';
 import Auth from './components/Auth';
+import ResetPassword from './components/ResetPassword';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsAndConditions from './components/TermsAndConditions';
 import ResearchObjectives from './components/ResearchObjectives';
@@ -43,6 +44,22 @@ interface CurrentUser {
 // --------------------------------------------------
 
 export default function App() {
+
+    // --------------------------------------------------
+  // PASSWORD RESET URL
+  // --------------------------------------------------
+
+  const resetPasswordMatch =
+    window.location.pathname.match(
+      /^\/reset-password\/([^/]+)\/?$/
+    );
+
+  const resetPasswordToken =
+    resetPasswordMatch
+      ? decodeURIComponent(
+          resetPasswordMatch[1]
+        )
+      : null;
 
   const [activeTab, setActiveTab] =
     useState<ActiveTab>('home');
@@ -354,6 +371,38 @@ export default function App() {
       <main className="flex-grow">
 
         <AnimatePresence mode="wait">
+
+                    {/* ------------------------------------------------ */}
+          {/* PASSWORD RESET */}
+          {/* ------------------------------------------------ */}
+
+          {resetPasswordToken && (
+
+            <motion.div
+              key="reset-password-view"
+              {...pageTransition}
+            >
+
+              <ResetPassword
+                resetToken={resetPasswordToken}
+
+                onBackToLogin={() => {
+
+                  window.history.pushState(
+                    {},
+                    '',
+                    '/'
+                  );
+
+                  setAuthMode('login');
+                  setActiveTab('auth');
+
+                }}
+              />
+
+            </motion.div>
+
+          )}
 
 
           {/* ------------------------------------------------ */}
