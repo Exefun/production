@@ -681,7 +681,7 @@ const handleGoogleSignIn = async () => {
                 <Sparkles className="h-4 w-4 animate-spin" />
 
                 <span>
-                  REDIRECTING TO EXEFUN HOME...
+                  REDIRECTING TO YOUR DASHBOARD...
                 </span>
 
               </div>
