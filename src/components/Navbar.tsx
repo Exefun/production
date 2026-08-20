@@ -215,19 +215,35 @@ export default function Navbar({ activeTab, setActiveTab, streak, currentUser, o
           <div className="hidden lg:flex items-center space-x-2.5">
             {currentUser ? (
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200/60 rounded-xl p-1.5 pr-3">
-                  <div className={`h-7 w-7 rounded-lg ${currentUser.avatarColor || 'bg-indigo-600'} text-white flex items-center justify-center text-[10px] font-mono font-bold tracking-tight shadow-inner`}>
-                    {currentUser.avatarTag || 'ST'}
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-mono font-bold text-slate-800 leading-none truncate max-w-[100px]" title={currentUser.name}>
-                      {currentUser.name}
-                    </p>
-                    <p className="text-[8px] font-sans text-slate-400 mt-0.5 max-w-[100px] truncate" title={currentUser.email}>
-                      {currentUser.email}
-                    </p>
-                  </div>
-                </div>
+               <button
+  type="button"
+  onClick={() => {
+    setActiveTab('dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }}
+  className="flex items-center space-x-2 bg-slate-50 border border-slate-200/60 rounded-xl p-1.5 pr-3 hover:bg-blue-50 hover:border-blue-200 transition-all cursor-pointer"
+  title="Open Dashboard"
+>
+  <div className={`h-7 w-7 rounded-lg ${currentUser.avatarColor || 'bg-indigo-600'} text-white flex items-center justify-center text-[10px] font-mono font-bold tracking-tight shadow-inner`}>
+    {currentUser.avatarTag || 'ST'}
+  </div>
+
+  <div className="text-left">
+    <p
+      className="text-[10px] font-mono font-bold text-slate-800 leading-none truncate max-w-[100px]"
+      title={currentUser.name}
+    >
+      {currentUser.name}
+    </p>
+
+    <p
+      className="text-[8px] font-sans text-slate-400 mt-0.5 max-w-[100px] truncate"
+      title={currentUser.email}
+    >
+      {currentUser.email}
+    </p>
+  </div>
+</button>
 
                 <button
                   onClick={() => {

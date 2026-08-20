@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Clock,
   RefreshCw,
+  XCircle,
 } from 'lucide-react';
 
 import { ActiveTab } from '../types';
@@ -77,13 +78,9 @@ const emptyProfile: ProfileForm = {
 };
 
 export default function Dashboard({
-
   user,
-
   setActiveTab,
-
   onLogout,
-
 }: DashboardProps) {
 
   const apiBaseUrl =
@@ -121,6 +118,9 @@ export default function Dashboard({
     useState(true);
 
   const [ticketsError, setTicketsError] =
+    useState<string | null>(null);
+
+  const [closingTicketId, setClosingTicketId] =
     useState<string | null>(null);
 
   // --------------------------------------------------
@@ -304,6 +304,101 @@ export default function Dashboard({
     loadSupportTickets();
 
   }, [apiBaseUrl, userId]);
+
+  // --------------------------------------------------
+  // CLOSE SUPPORT TICKET
+  // --------------------------------------------------
+
+  const handleCloseTicket =
+    async (ticketId: string) => {
+
+      if (!ticketId) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          'Are you sure you want to close this support ticket? This will mark the ticket as resolved.'
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+
+        setClosingTicketId(ticketId);
+        setTicketsError(null);
+
+        const response =
+          await fetch(
+            `${apiBaseUrl}/usersupport/${encodeURIComponent(
+              ticketId
+            )}/close`,
+            {
+              method: 'PUT',
+
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+
+          throw new Error(
+            data.message ||
+            'Unable to close this support ticket.'
+          );
+
+        }
+
+        // ------------------------------------------------
+        // UPDATE THE TICKET LOCALLY
+        // ------------------------------------------------
+
+        setSupportTickets(
+          previousTickets =>
+            previousTickets.map(ticket =>
+              ticket.ticketId === ticketId
+                ? {
+                    ...ticket,
+                    mstatus: 1,
+                  }
+                : ticket
+            )
+        );
+
+        setSuccess(
+          `Support ticket ${ticketId} has been marked as resolved.`
+        );
+
+      } catch (err: any) {
+
+        console.error(
+          'Support ticket close error:',
+          err
+        );
+
+        setTicketsError(
+          err?.message ||
+          'Unable to close this support ticket. Please try again.'
+        );
+
+      } finally {
+
+        setClosingTicketId(null);
+
+      }
+
+    };
 
   // --------------------------------------------------
   // HANDLE INPUT
@@ -526,6 +621,7 @@ export default function Dashboard({
 
         default:
           return category;
+
       }
 
     };
@@ -631,7 +727,9 @@ export default function Dashboard({
 
       <div className="mx-auto max-w-5xl">
 
+        {/* ------------------------------------------------ */}
         {/* HEADER */}
+        {/* ------------------------------------------------ */}
 
         <div className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
 
@@ -691,7 +789,9 @@ export default function Dashboard({
 
         </div>
 
+        {/* ------------------------------------------------ */}
         {/* PROFILE STATUS */}
+        {/* ------------------------------------------------ */}
 
         <div
           className={`mb-6 rounded-2xl border p-5 ${
@@ -745,7 +845,9 @@ export default function Dashboard({
 
         </div>
 
+        {/* ------------------------------------------------ */}
         {/* ERROR */}
+        {/* ------------------------------------------------ */}
 
         {error && (
 
@@ -765,7 +867,9 @@ export default function Dashboard({
 
         )}
 
+        {/* ------------------------------------------------ */}
         {/* SUCCESS */}
+        {/* ------------------------------------------------ */}
 
         {success && (
 
@@ -785,7 +889,9 @@ export default function Dashboard({
 
         )}
 
+        {/* ------------------------------------------------ */}
         {/* PROFILE FORM */}
+        {/* ------------------------------------------------ */}
 
         <form
           onSubmit={handleSaveProfile}
@@ -1133,6 +1239,8 @@ export default function Dashboard({
 
         <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
+          {/* HEADER */}
+
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
             <div className="flex items-center gap-3">
@@ -1150,7 +1258,7 @@ export default function Dashboard({
                 </h2>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  View support requests submitted from your account.
+                  View and manage support requests submitted from your account.
                 </p>
 
               </div>
@@ -1200,19 +1308,20 @@ export default function Dashboard({
 
           {/* TICKETS LOADING */}
 
-          {isTicketsLoading && !ticketsError && (
+          {isTicketsLoading &&
+            !ticketsError && (
 
-            <div className="mt-8 flex flex-col items-center justify-center py-10">
+              <div className="mt-8 flex flex-col items-center justify-center py-10">
 
-              <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+                <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
 
-              <p className="mt-3 text-xs font-semibold text-slate-500">
-                Loading your support tickets...
-              </p>
+                <p className="mt-3 text-xs font-semibold text-slate-500">
+                  Loading your support tickets...
+                </p>
 
-            </div>
+              </div>
 
-          )}
+            )}
 
           {/* NO TICKETS */}
 
@@ -1255,88 +1364,138 @@ export default function Dashboard({
               <div className="mt-6 space-y-4">
 
                 {supportTickets.map(
-                  ticket => (
+                  ticket => {
 
-                    <div
-                      key={ticket.id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-blue-200 hover:bg-white"
-                    >
+                    const isOpen =
+                      Number(ticket.mstatus) === 0;
 
-                      {/* TOP */}
+                    const isClosing =
+                      closingTicketId ===
+                      ticket.ticketId;
 
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    return (
 
-                        <div>
+                      <div
+                        key={ticket.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-blue-200 hover:bg-white"
+                      >
 
-                          <div className="flex flex-wrap items-center gap-2">
+                        {/* TOP */}
 
-                            <span className="font-mono text-xs font-extrabold tracking-wider text-indigo-600">
-                              {ticket.ticketId}
-                            </span>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 
-                            <span
-                              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${getStatusClasses(
-                                ticket.mstatus
-                              )}`}
-                            >
-                              {getStatusLabel(
-                                ticket.mstatus
+                          <div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+
+                              <span className="font-mono text-xs font-extrabold tracking-wider text-indigo-600">
+                                {ticket.ticketId}
+                              </span>
+
+                              <span
+                                className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${getStatusClasses(
+                                  ticket.mstatus
+                                )}`}
+                              >
+                                {getStatusLabel(
+                                  ticket.mstatus
+                                )}
+                              </span>
+
+                            </div>
+
+                            <h3 className="mt-2 text-sm font-extrabold text-slate-900">
+                              {getCategoryLabel(
+                                ticket.category
                               )}
-                            </span>
+                            </h3>
 
                           </div>
 
-                          <h3 className="mt-2 text-sm font-extrabold text-slate-900">
-                            {getCategoryLabel(
-                              ticket.category
+                          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+
+                            <Clock className="h-3.5 w-3.5" />
+
+                            {formatTicketDate(
+                              ticket.createdAt
                             )}
-                          </h3>
+
+                          </div>
 
                         </div>
 
-                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                        {/* MESSAGE */}
 
-                          <Clock className="h-3.5 w-3.5" />
+                        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
 
-                          {formatTicketDate(
-                            ticket.createdAt
+                          <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
+                            {ticket.message}
+                          </p>
+
+                        </div>
+
+                        {/* META */}
+
+                        <div className="mt-4 flex flex-col gap-3 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+
+                          <div className="flex flex-col gap-1">
+
+                            <span>
+                              Email: {ticket.email}
+                            </span>
+
+                            {ticket.affiliation && (
+
+                              <span>
+                                Affiliation: {ticket.affiliation}
+                              </span>
+
+                            )}
+
+                          </div>
+
+                          {/* CLOSE TICKET */}
+
+                          {isOpen && (
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCloseTicket(
+                                  ticket.ticketId
+                                )
+                              }
+                              disabled={isClosing}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-[10px] font-bold text-red-600 transition-all hover:border-red-300 hover:bg-red-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+
+                              {isClosing ? (
+
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  Closing Ticket...
+                                </>
+
+                              ) : (
+
+                                <>
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  Close Ticket
+                                </>
+
+                              )}
+
+                            </button>
+
                           )}
 
                         </div>
 
                       </div>
 
-                      {/* MESSAGE */}
+                    );
 
-                      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-
-                        <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
-                          {ticket.message}
-                        </p>
-
-                      </div>
-
-                      {/* META */}
-
-                      <div className="mt-4 flex flex-col gap-2 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-
-                        <span>
-                          Email: {ticket.email}
-                        </span>
-
-                        {ticket.affiliation && (
-
-                          <span>
-                            Affiliation: {ticket.affiliation}
-                          </span>
-
-                        )}
-
-                      </div>
-
-                    </div>
-
-                  )
+                  }
                 )}
 
               </div>
@@ -1345,7 +1504,9 @@ export default function Dashboard({
 
         </div>
 
+        {/* ------------------------------------------------ */}
         {/* SIGN OUT */}
+        {/* ------------------------------------------------ */}
 
         <div className="mt-8 flex justify-end">
 
