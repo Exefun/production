@@ -68,6 +68,22 @@ interface SupportTicket {
   createdAt: string;
 }
 
+interface QuestionnaireQuestion {
+  id: number;
+  a1: number;
+  a2: string;
+  a3: string;
+  a4: string;
+  a5: string;
+}
+
+interface QuestionnaireAnswer {
+  taskId: number;
+  responseValue: number;
+  scoredValue: number;
+  dimension: string;
+}
+
 const emptyProfile: ProfileForm = {
   age: '',
   dob: '',
@@ -77,12 +93,47 @@ const emptyProfile: ProfileForm = {
   backgroundInformation: '',
 };
 
+/*
+ * --------------------------------------------------
+ * QUESTIONNAIRE SCALE
+ * --------------------------------------------------
+ *
+ * This was missing from the previous version.
+ * It is explicitly typed so TypeScript knows the
+ * type of "option" when likertScale.map(...) is used.
+ */
+
+const likertScale: {
+  value: number;
+  label: string;
+}[] = [
+  {
+    value: 1,
+    label: 'Never',
+  },
+  {
+    value: 2,
+    label: 'Rarely',
+  },
+  {
+    value: 3,
+    label: 'Sometimes',
+  },
+  {
+    value: 4,
+    label: 'Often',
+  },
+  {
+    value: 5,
+    label: 'Always',
+  },
+];
+
 export default function Dashboard({
   user,
   setActiveTab,
   onLogout,
 }: DashboardProps) {
-
   const apiBaseUrl =
     import.meta.env.VITE_API_URL;
 
@@ -124,15 +175,369 @@ export default function Dashboard({
     useState<string | null>(null);
 
   // --------------------------------------------------
+  // QUESTIONNAIRE
+  // --------------------------------------------------
+
+  const [questionnaire, setQuestionnaire] =
+    useState<QuestionnaireQuestion[]>([]);
+
+  const [questionnaireAnswers, setQuestionnaireAnswers] =
+    useState<Record<number, number>>({});
+
+  const [isQuestionnaireLoading, setIsQuestionnaireLoading] =
+    useState(true);
+
+  const [isQuestionnaireSubmitting, setIsQuestionnaireSubmitting] =
+    useState(false);
+
+  const [questionnaireError, setQuestionnaireError] =
+    useState<string | null>(null);
+
+  const [questionnaireSubmitted, setQuestionnaireSubmitted] =
+    useState(false);
+
+  const [questionnaireScore, setQuestionnaireScore] =
+    useState<number | null>(null);
+
+  const isReverseItem = (
+    question: QuestionnaireQuestion
+  ) =>
+    question.a4
+      ?.toLowerCase()
+      .includes('negative');
+
+  const getScoredValue = (
+    question: QuestionnaireQuestion,
+    responseValue: number
+  ) => {
+    if (isReverseItem(question)) {
+      return 6 - responseValue;
+    }
+
+    return responseValue;
+  };
+
+  // --------------------------------------------------
+  // LOAD QUESTIONNAIRE
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const loadQuestionnaire = async () => {
+      try {
+        setIsQuestionnaireLoading(true);
+        setQuestionnaireError(null);
+
+        const response = await fetch(
+          `${apiBaseUrl}/questiontasks`
+        );
+
+        const contentType =
+          response.headers.get('content-type') || '';
+
+        if (!contentType.includes('application/json')) {
+          throw new Error(
+            'The questionnaire API did not return JSON. Please check the API URL and backend route.'
+          );
+        }
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.message ||
+            'Unable to load questionnaire.'
+          );
+        }
+
+        const questions =
+          Array.isArray(data.questions)
+            ? data.questions
+            : [];
+
+        if (questions.length !== 65) {
+          console.warn(
+            `Expected 65 questionnaire items, received ${questions.length}.`
+          );
+        }
+
+        setQuestionnaire(questions);
+      } catch (err: any) {
+        console.error(
+          'Questionnaire loading error:',
+          err
+        );
+
+        setQuestionnaireError(
+          err?.message ||
+          'Unable to load the questionnaire.'
+        );
+      } finally {
+        setIsQuestionnaireLoading(false);
+      }
+    };
+
+    loadQuestionnaire();
+  }, [apiBaseUrl]);
+
+  const handleQuestionnaireAnswer = (
+    questionId: number,
+    value: number
+  ) => {
+    setQuestionnaireAnswers(previous => ({
+      ...previous,
+      [questionId]: value,
+    }));
+
+    setQuestionnaireError(null);
+    setQuestionnaireSubmitted(false);
+  };
+
+  const answeredQuestionCount =
+    questionnaire.filter(
+      question =>
+        questionnaireAnswers[question.id] !== undefined
+    ).length;
+
+  const questionnaireProgress =
+    questionnaire.length > 0
+      ? Math.round(
+          (answeredQuestionCount /
+            questionnaire.length) *
+            100
+        )
+      : 0;
+
+  const calculateDimensionScores = () => {
+    const dimensions: Record<
+      string,
+      {
+        total: number;
+        count: number;
+      }
+    > = {};
+
+    questionnaire.forEach(question => {
+      const response =
+        questionnaireAnswers[question.id];
+
+      if (response === undefined) {
+        return;
+      }
+
+      const scoredValue =
+        getScoredValue(
+          question,
+          response
+        );
+
+      const dimension =
+        question.a5;
+
+      if (!dimensions[dimension]) {
+        dimensions[dimension] = {
+          total: 0,
+          count: 0,
+        };
+      }
+
+      dimensions[dimension].total +=
+        scoredValue;
+
+      dimensions[dimension].count += 1;
+    });
+
+    return Object.entries(dimensions).map(
+      ([dimension, data]) => ({
+        dimension,
+        average:
+          data.count > 0
+            ? data.total / data.count
+            : 0,
+      })
+    );
+  };
+
+  const handleSubmitQuestionnaire =
+    async (
+      e: React.FormEvent
+    ) => {
+      e.preventDefault();
+
+      setQuestionnaireError(null);
+
+      // --------------------------------------------------
+      // CHECK USER
+      // --------------------------------------------------
+
+      if (!userId) {
+        setQuestionnaireError(
+          'Unable to identify your account. Please sign in again.'
+        );
+
+        return;
+      }
+
+      // --------------------------------------------------
+      // CHECK ALL QUESTIONS
+      // --------------------------------------------------
+
+      if (
+        questionnaire.length === 0
+      ) {
+        setQuestionnaireError(
+          'The questionnaire is currently unavailable.'
+        );
+
+        return;
+      }
+
+      const unanswered =
+        questionnaire.filter(
+          question =>
+            questionnaireAnswers[
+              question.id
+            ] === undefined
+        );
+
+      if (unanswered.length > 0) {
+        setQuestionnaireError(
+          `Please answer all questions before submitting. ${unanswered.length} question${
+            unanswered.length === 1
+              ? ''
+              : 's'
+          } remaining.`
+        );
+
+        return;
+      }
+
+      try {
+        setIsQuestionnaireSubmitting(true);
+
+        const answers:
+          QuestionnaireAnswer[] =
+          questionnaire.map(question => {
+            const responseValue =
+              questionnaireAnswers[
+                question.id
+              ];
+
+            return {
+              taskId: question.id,
+
+              responseValue,
+
+              scoredValue:
+                getScoredValue(
+                  question,
+                  responseValue
+                ),
+
+              dimension:
+                question.a5,
+            };
+          });
+
+        const totalScore =
+          answers.reduce(
+            (total, answer) =>
+              total +
+              answer.scoredValue,
+            0
+          );
+
+        const response =
+          await fetch(
+            `${apiBaseUrl}/questionnaire/submit`,
+            {
+              method: 'POST',
+
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+
+              body: JSON.stringify({
+                userId:
+                  Number(userId),
+
+                answers,
+              }),
+            }
+          );
+
+        const contentType =
+          response.headers.get(
+            'content-type'
+          ) || '';
+
+        if (
+          !contentType.includes(
+            'application/json'
+          )
+        ) {
+          throw new Error(
+            'The questionnaire submission API did not return JSON. Please check the backend route.'
+          );
+        }
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.message ||
+            'Unable to submit questionnaire.'
+          );
+        }
+
+        setQuestionnaireScore(
+          totalScore
+        );
+
+        setQuestionnaireSubmitted(
+          true
+        );
+
+        setSuccess(
+          'Your questionnaire has been submitted successfully.'
+        );
+
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth',
+        });
+      } catch (err: any) {
+        console.error(
+          'Questionnaire submission error:',
+          err
+        );
+
+        setQuestionnaireError(
+          err?.message ||
+          'Unable to submit the questionnaire. Please try again.'
+        );
+      } finally {
+        setIsQuestionnaireSubmitting(
+          false
+        );
+      }
+    };
+
+  // --------------------------------------------------
   // LOAD USER PROFILE
   // --------------------------------------------------
 
   useEffect(() => {
-
     const loadProfile = async () => {
-
       if (!userId) {
-
         setError(
           'Unable to identify your account. Please sign in again.'
         );
@@ -143,7 +548,6 @@ export default function Dashboard({
       }
 
       try {
-
         setIsLoading(true);
         setError(null);
 
@@ -158,19 +562,16 @@ export default function Dashboard({
           !response.ok ||
           !data.success
         ) {
-
           throw new Error(
             data.message ||
             'Unable to load your profile.'
           );
-
         }
 
         const profile: UserProfile =
           data.profile;
 
         setForm({
-
           age:
             profile.age !== null &&
             profile.age !== undefined
@@ -205,9 +606,7 @@ export default function Dashboard({
             profile.profileCompleted
           )
         );
-
       } catch (err: any) {
-
         console.error(
           'Profile loading error:',
           err
@@ -217,17 +616,12 @@ export default function Dashboard({
           err?.message ||
           'Unable to load your profile.'
         );
-
       } finally {
-
         setIsLoading(false);
-
       }
-
     };
 
     loadProfile();
-
   }, [apiBaseUrl, userId]);
 
   // --------------------------------------------------
@@ -236,9 +630,7 @@ export default function Dashboard({
 
   const loadSupportTickets =
     async () => {
-
       if (!userId) {
-
         setTicketsError(
           'Unable to identify your account.'
         );
@@ -249,7 +641,6 @@ export default function Dashboard({
       }
 
       try {
-
         setIsTicketsLoading(true);
         setTicketsError(null);
 
@@ -265,12 +656,10 @@ export default function Dashboard({
           !response.ok ||
           !data.success
         ) {
-
           throw new Error(
             data.message ||
             'Unable to load your support tickets.'
           );
-
         }
 
         setSupportTickets(
@@ -278,9 +667,7 @@ export default function Dashboard({
             ? data.tickets
             : []
         );
-
       } catch (err: any) {
-
         console.error(
           'Support ticket loading error:',
           err
@@ -290,151 +677,141 @@ export default function Dashboard({
           err?.message ||
           'Unable to load your support tickets.'
         );
-
       } finally {
-
         setIsTicketsLoading(false);
-
       }
-
     };
 
   useEffect(() => {
-
     loadSupportTickets();
-
   }, [apiBaseUrl, userId]);
 
   // --------------------------------------------------
   // CLOSE SUPPORT TICKET
   // --------------------------------------------------
 
-// --------------------------------------------------
-// CLOSE SUPPORT TICKET
-// --------------------------------------------------
+  const handleCloseTicket = async (
+    ticketId: string
+  ) => {
+    if (!ticketId) {
+      return;
+    }
 
-const handleCloseTicket = async (ticketId: string) => {
+    if (!userId) {
+      setTicketsError(
+        'Unable to identify your account. Please sign in again.'
+      );
 
-  if (!ticketId) {
-    return;
-  }
+      return;
+    }
 
-  if (!userId) {
-    setTicketsError(
-      'Unable to identify your account. Please sign in again.'
+    const confirmed = window.confirm(
+      'Are you sure you want to close this support ticket? This will mark the ticket as resolved.'
     );
-    return;
-  }
 
-  const confirmed = window.confirm(
-    'Are you sure you want to close this support ticket? This will mark the ticket as resolved.'
-  );
+    if (!confirmed) {
+      return;
+    }
 
-  if (!confirmed) {
-    return;
-  }
+    try {
+      setClosingTicketId(ticketId);
+      setTicketsError(null);
+      setSuccess(null);
 
-  try {
+      const response = await fetch(
+        `${apiBaseUrl}/supportticket/${encodeURIComponent(ticketId)}/close`,
+        {
+          method: 'PUT',
 
-    setClosingTicketId(ticketId);
-    setTicketsError(null);
-    setSuccess(null);
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
 
-    const response = await fetch(
-      `${apiBaseUrl}/supportticket/${encodeURIComponent(ticketId)}/close`,
-      {
-        method: 'PUT',
+          body: JSON.stringify({
+            userId: Number(userId),
+          }),
+        }
+      );
 
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+      // --------------------------------------------------
+      // SAFELY READ RESPONSE
+      // --------------------------------------------------
 
-        body: JSON.stringify({
-          userId: Number(userId),
-        }),
+      const contentType =
+        response.headers.get('content-type') || '';
+
+      let data: any = null;
+
+      if (
+        contentType.includes(
+          'application/json'
+        )
+      ) {
+        data = await response.json();
+      } else {
+        const text =
+          await response.text();
+
+        console.error(
+          'Unexpected non-JSON response when closing ticket:',
+          text
+        );
+
+        throw new Error(
+          `Server returned an unexpected response (${response.status}).`
+        );
       }
-    );
 
-    // --------------------------------------------------
-    // SAFELY READ RESPONSE
-    // --------------------------------------------------
+      // --------------------------------------------------
+      // HANDLE API ERROR
+      // --------------------------------------------------
 
-    const contentType =
-      response.headers.get('content-type') || '';
+      if (
+        !response.ok ||
+        !data?.success
+      ) {
+        throw new Error(
+          data?.message ||
+          'Unable to close this support ticket.'
+        );
+      }
 
-    let data: any = null;
+      // --------------------------------------------------
+      // UPDATE TICKET LOCALLY
+      // --------------------------------------------------
 
-    if (contentType.includes('application/json')) {
+      setSupportTickets(
+        previousTickets =>
+          previousTickets.map(
+            ticket =>
+              ticket.ticketId === ticketId
+                ? {
+                    ...ticket,
+                    mstatus: 1,
+                  }
+                : ticket
+          )
+      );
 
-      data = await response.json();
-
-    } else {
-
-      const text = await response.text();
-
+      setSuccess(
+        data.message ||
+        `Support ticket ${ticketId} has been marked as resolved.`
+      );
+    } catch (err: any) {
       console.error(
-        'Unexpected non-JSON response when closing ticket:',
-        text
+        'Support ticket close error:',
+        err
       );
 
-      throw new Error(
-        `Server returned an unexpected response (${response.status}).`
+      setTicketsError(
+        err?.message ||
+        'Unable to close this support ticket. Please try again.'
       );
-
+    } finally {
+      setClosingTicketId(null);
     }
-
-    // --------------------------------------------------
-    // HANDLE API ERROR
-    // --------------------------------------------------
-
-    if (!response.ok || !data?.success) {
-
-      throw new Error(
-        data?.message ||
-        'Unable to close this support ticket.'
-      );
-
-    }
-
-    // --------------------------------------------------
-    // UPDATE TICKET LOCALLY
-    // --------------------------------------------------
-
-    setSupportTickets(previousTickets =>
-      previousTickets.map(ticket =>
-        ticket.ticketId === ticketId
-          ? {
-              ...ticket,
-              mstatus: 1,
-            }
-          : ticket
-      )
-    );
-
-    setSuccess(
-      data.message ||
-      `Support ticket ${ticketId} has been marked as resolved.`
-    );
-
-  } catch (err: any) {
-
-    console.error(
-      'Support ticket close error:',
-      err
-    );
-
-    setTicketsError(
-      err?.message ||
-      'Unable to close this support ticket. Please try again.'
-    );
-
-  } finally {
-
-    setClosingTicketId(null);
-
-  }
-};
+  };
 
   // --------------------------------------------------
   // HANDLE INPUT
@@ -444,7 +821,6 @@ const handleCloseTicket = async (ticketId: string) => {
     field: keyof ProfileForm,
     value: string
   ) => {
-
     setForm(prev => ({
       ...prev,
       [field]: value,
@@ -452,7 +828,6 @@ const handleCloseTicket = async (ticketId: string) => {
 
     setError(null);
     setSuccess(null);
-
   };
 
   // --------------------------------------------------
@@ -460,7 +835,6 @@ const handleCloseTicket = async (ticketId: string) => {
   // --------------------------------------------------
 
   const validateForm = () => {
-
     const age =
       Number(form.age);
 
@@ -476,9 +850,7 @@ const handleCloseTicket = async (ticketId: string) => {
       age <= 0 ||
       age > 120
     ) {
-
       return 'Please enter a valid age.';
-
     }
 
     if (!form.dob) {
@@ -496,9 +868,7 @@ const handleCloseTicket = async (ticketId: string) => {
       yearsOfEducation < 0 ||
       yearsOfEducation > 100
     ) {
-
       return 'Please enter a valid number of years of education.';
-
     }
 
     if (!form.gender) {
@@ -523,7 +893,6 @@ const handleCloseTicket = async (ticketId: string) => {
   const handleSaveProfile = async (
     e: React.FormEvent
   ) => {
-
     e.preventDefault();
 
     setError(null);
@@ -533,7 +902,6 @@ const handleCloseTicket = async (ticketId: string) => {
       validateForm();
 
     if (validationError) {
-
       setError(
         validationError
       );
@@ -542,7 +910,6 @@ const handleCloseTicket = async (ticketId: string) => {
     }
 
     if (!userId) {
-
       setError(
         'Unable to identify your account. Please sign in again.'
       );
@@ -551,7 +918,6 @@ const handleCloseTicket = async (ticketId: string) => {
     }
 
     try {
-
       setIsSaving(true);
 
       const response =
@@ -596,12 +962,10 @@ const handleCloseTicket = async (ticketId: string) => {
         !response.ok ||
         !data.success
       ) {
-
         throw new Error(
           data.message ||
           'Unable to save your profile.'
         );
-
       }
 
       setProfileCompleted(
@@ -613,9 +977,7 @@ const handleCloseTicket = async (ticketId: string) => {
       setSuccess(
         'Your profile has been saved successfully.'
       );
-
     } catch (err: any) {
-
       console.error(
         'Profile save error:',
         err
@@ -625,13 +987,9 @@ const handleCloseTicket = async (ticketId: string) => {
         err?.message ||
         'Unable to save your profile.'
       );
-
     } finally {
-
       setIsSaving(false);
-
     }
-
   };
 
   // --------------------------------------------------
@@ -640,9 +998,7 @@ const handleCloseTicket = async (ticketId: string) => {
 
   const getCategoryLabel =
     (category: string) => {
-
       switch (category) {
-
         case 'bug':
           return 'Cognitive Module Bug';
 
@@ -657,14 +1013,11 @@ const handleCloseTicket = async (ticketId: string) => {
 
         default:
           return category;
-
       }
-
     };
 
   const getStatusLabel =
     (status: number) => {
-
       if (Number(status) === 0) {
         return 'Open';
       }
@@ -674,31 +1027,23 @@ const handleCloseTicket = async (ticketId: string) => {
       }
 
       return 'In Progress';
-
     };
 
   const getStatusClasses =
     (status: number) => {
-
       if (Number(status) === 0) {
-
         return 'bg-amber-50 text-amber-700 border-amber-200';
-
       }
 
       if (Number(status) === 1) {
-
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-
       }
 
       return 'bg-blue-50 text-blue-700 border-blue-200';
-
     };
 
   const formatTicketDate =
     (dateValue: string) => {
-
       if (!dateValue) {
         return 'Unknown date';
       }
@@ -711,9 +1056,7 @@ const handleCloseTicket = async (ticketId: string) => {
           date.getTime()
         )
       ) {
-
         return dateValue;
-
       }
 
       return date.toLocaleString(
@@ -726,7 +1069,6 @@ const handleCloseTicket = async (ticketId: string) => {
           minute: '2-digit',
         }
       );
-
     };
 
   // --------------------------------------------------
@@ -734,23 +1076,17 @@ const handleCloseTicket = async (ticketId: string) => {
   // --------------------------------------------------
 
   if (isLoading) {
-
     return (
       <div className="min-h-[85vh] bg-slate-50 flex items-center justify-center px-4">
-
         <div className="flex flex-col items-center text-center">
-
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
 
           <p className="mt-3 text-sm font-semibold text-slate-600">
             Loading your profile...
           </p>
-
         </div>
-
       </div>
     );
-
   }
 
   // --------------------------------------------------
@@ -758,9 +1094,7 @@ const handleCloseTicket = async (ticketId: string) => {
   // --------------------------------------------------
 
   return (
-
     <div className="min-h-[85vh] bg-slate-50 px-4 py-10 sm:px-6 lg:px-8">
-
       <div className="mx-auto max-w-5xl">
 
         {/* ------------------------------------------------ */}
@@ -768,21 +1102,15 @@ const handleCloseTicket = async (ticketId: string) => {
         {/* ------------------------------------------------ */}
 
         <div className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-
           <div>
-
             <div className="mb-2 flex items-center gap-2">
-
               <div className="rounded-lg bg-blue-600 p-2">
-
                 <Brain className="h-5 w-5 text-white" />
-
               </div>
 
               <span className="text-xs font-mono font-bold uppercase tracking-widest text-blue-600">
                 Exefun Dashboard
               </span>
-
             </div>
 
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
@@ -792,11 +1120,9 @@ const handleCloseTicket = async (ticketId: string) => {
             <p className="mt-1 text-sm text-slate-500">
               Complete your profile before beginning your Exefun experience.
             </p>
-
           </div>
 
           <div className="flex items-center gap-3">
-
             <div
               className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white ${
                 user.avatarColor ||
@@ -810,7 +1136,6 @@ const handleCloseTicket = async (ticketId: string) => {
             </div>
 
             <div className="hidden sm:block">
-
               <p className="text-sm font-bold text-slate-900">
                 {user.name}
               </p>
@@ -818,11 +1143,8 @@ const handleCloseTicket = async (ticketId: string) => {
               <p className="text-xs text-slate-500">
                 {user.email}
               </p>
-
             </div>
-
           </div>
-
         </div>
 
         {/* ------------------------------------------------ */}
@@ -836,21 +1158,14 @@ const handleCloseTicket = async (ticketId: string) => {
               : 'border-amber-200 bg-amber-50'
           }`}
         >
-
           <div className="flex items-start gap-3">
-
             {profileCompleted ? (
-
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-
             ) : (
-
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-
             )}
 
             <div>
-
               <h2
                 className={`text-sm font-extrabold ${
                   profileCompleted
@@ -874,11 +1189,8 @@ const handleCloseTicket = async (ticketId: string) => {
                   ? 'Your required demographic and educational information has been completed.'
                   : 'Please complete all required information below to activate your profile.'}
               </p>
-
             </div>
-
           </div>
-
         </div>
 
         {/* ------------------------------------------------ */}
@@ -886,21 +1198,15 @@ const handleCloseTicket = async (ticketId: string) => {
         {/* ------------------------------------------------ */}
 
         {error && (
-
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4">
-
             <div className="flex items-start gap-3">
-
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
 
               <p className="text-sm text-red-700">
                 {error}
               </p>
-
             </div>
-
           </div>
-
         )}
 
         {/* ------------------------------------------------ */}
@@ -908,21 +1214,15 @@ const handleCloseTicket = async (ticketId: string) => {
         {/* ------------------------------------------------ */}
 
         {success && (
-
           <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-
             <div className="flex items-start gap-3">
-
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
 
               <p className="text-sm text-emerald-700">
                 {success}
               </p>
-
             </div>
-
           </div>
-
         )}
 
         {/* ------------------------------------------------ */}
@@ -933,19 +1233,13 @@ const handleCloseTicket = async (ticketId: string) => {
           onSubmit={handleSaveProfile}
           className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
         >
-
           <div className="mb-8">
-
             <div className="flex items-center gap-3">
-
               <div className="rounded-xl bg-blue-50 p-3">
-
                 <UserRound className="h-5 w-5 text-blue-600" />
-
               </div>
 
               <div>
-
                 <h2 className="text-xl font-extrabold text-slate-900">
                   Complete Your Profile
                 </h2>
@@ -953,11 +1247,8 @@ const handleCloseTicket = async (ticketId: string) => {
                 <p className="mt-1 text-xs text-slate-500">
                   All fields below are required.
                 </p>
-
               </div>
-
             </div>
-
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -965,15 +1256,12 @@ const handleCloseTicket = async (ticketId: string) => {
             {/* AGE */}
 
             <div>
-
               <label className="mb-2 flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-600">
-
                 <UserRound className="h-4 w-4 text-slate-400" />
 
                 Age
 
                 <span className="text-red-500">*</span>
-
               </label>
 
               <input
@@ -991,21 +1279,17 @@ const handleCloseTicket = async (ticketId: string) => {
                 placeholder="Enter your age"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white"
               />
-
             </div>
 
             {/* DOB */}
 
             <div>
-
               <label className="mb-2 flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-600">
-
                 <CalendarDays className="h-4 w-4 text-slate-400" />
 
                 Date of Birth
 
                 <span className="text-red-500">*</span>
-
               </label>
 
               <input
@@ -1020,21 +1304,17 @@ const handleCloseTicket = async (ticketId: string) => {
                 }
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white"
               />
-
             </div>
 
             {/* YEARS OF EDUCATION */}
 
             <div>
-
               <label className="mb-2 flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-600">
-
                 <BookOpen className="h-4 w-4 text-slate-400" />
 
                 Years of Education
 
                 <span className="text-red-500">*</span>
-
               </label>
 
               <input
@@ -1052,21 +1332,17 @@ const handleCloseTicket = async (ticketId: string) => {
                 placeholder="e.g. 16"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white"
               />
-
             </div>
 
             {/* GENDER */}
 
             <div>
-
               <label className="mb-2 flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-600">
-
                 <Users className="h-4 w-4 text-slate-400" />
 
                 Gender
 
                 <span className="text-red-500">*</span>
-
               </label>
 
               <select
@@ -1080,7 +1356,6 @@ const handleCloseTicket = async (ticketId: string) => {
                 }
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white"
               >
-
                 <option value="">
                   Select gender
                 </option>
@@ -1096,23 +1371,18 @@ const handleCloseTicket = async (ticketId: string) => {
                 <option value="other">
                   Other
                 </option>
-
               </select>
-
             </div>
 
             {/* EDUCATION LEVEL */}
 
             <div>
-
               <label className="mb-2 flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-600">
-
                 <GraduationCap className="h-4 w-4 text-slate-400" />
 
                 Education Level
 
                 <span className="text-red-500">*</span>
-
               </label>
 
               <select
@@ -1126,7 +1396,6 @@ const handleCloseTicket = async (ticketId: string) => {
                 }
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white"
               >
-
                 <option value="">
                   Select education level
                 </option>
@@ -1154,23 +1423,18 @@ const handleCloseTicket = async (ticketId: string) => {
                 <option value="Other">
                   Other
                 </option>
-
               </select>
-
             </div>
 
             {/* BACKGROUND */}
 
             <div>
-
               <label className="mb-2 flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-600">
-
                 <HeartPulse className="h-4 w-4 text-slate-400" />
 
                 Background Information
 
                 <span className="text-red-500">*</span>
-
               </label>
 
               <select
@@ -1186,7 +1450,6 @@ const handleCloseTicket = async (ticketId: string) => {
                 }
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-500 focus:bg-white"
               >
-
                 <option value="">
                   Select background information
                 </option>
@@ -1218,56 +1481,340 @@ const handleCloseTicket = async (ticketId: string) => {
                 <option value="None">
                   None
                 </option>
-
               </select>
-
             </div>
-
           </div>
 
           <div className="mt-8 rounded-2xl bg-slate-50 p-4">
-
             <p className="text-xs leading-relaxed text-slate-500">
-
               <span className="font-bold text-slate-700">
                 Required information:
               </span>{' '}
 
               All six profile fields must be completed before your profile can be considered active.
-
             </p>
-
           </div>
 
           <div className="mt-8 flex justify-end">
-
             <button
               type="submit"
               disabled={isSaving}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
-
               {isSaving ? (
-
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Saving Profile...
                 </>
-
               ) : (
-
                 <>
                   <Save className="h-4 w-4" />
                   Save Profile
                 </>
-
               )}
-
             </button>
+          </div>
+        </form>
 
+        {/* ------------------------------------------------ */}
+        {/* EXECUTIVE FUNCTIONING QUESTIONNAIRE */}
+        {/* ------------------------------------------------ */}
+
+        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+
+          {/* HEADER */}
+
+          <div className="flex flex-col gap-5">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-blue-50 p-3">
+                <Brain className="h-5 w-5 text-blue-600" />
+              </div>
+
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900">
+                  Executive Functioning Questionnaire
+                </h2>
+
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Please answer each statement based on how often the statement
+                  describes your typical academic experience.
+                </p>
+              </div>
+            </div>
+
+            {/* SCALE */}
+
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+              <p className="text-xs font-extrabold text-slate-700">
+                Five-Point Scale
+              </p>
+
+              <div className="mt-3 grid grid-cols-5 gap-1.5">
+                {likertScale.map(option => (
+                  <div
+                    key={option.value}
+                    className="rounded-lg border border-blue-100 bg-white px-2 py-2 text-center"
+                  >
+                    <p className="text-sm font-extrabold text-blue-600">
+                      {option.value}
+                    </p>
+
+                    <p className="mt-0.5 text-[9px] font-bold text-slate-600 sm:text-[10px]">
+                      {option.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-3 text-[10px] leading-relaxed text-slate-500">
+                Higher scores indicate stronger executive-functioning skills
+                within the relevant domain.
+              </p>
+            </div>
           </div>
 
-        </form>
+          {/* PROGRESS */}
+
+          {!isQuestionnaireLoading &&
+            questionnaire.length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
+                    Questionnaire Progress
+                  </span>
+
+                  <span className="text-xs font-extrabold text-blue-600">
+                    {answeredQuestionCount} / {questionnaire.length}
+                  </span>
+                </div>
+
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                    style={{
+                      width: `${questionnaireProgress}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+          {/* ERROR */}
+
+          {questionnaireError && (
+            <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+
+                <p className="text-sm text-red-700">
+                  {questionnaireError}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* LOADING */}
+
+          {isQuestionnaireLoading && (
+            <div className="flex flex-col items-center justify-center py-14">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+
+              <p className="mt-3 text-sm font-semibold text-slate-500">
+                Loading questionnaire...
+              </p>
+            </div>
+          )}
+
+          {/* QUESTIONNAIRE */}
+
+          {!isQuestionnaireLoading &&
+            questionnaire.length > 0 && (
+              <form
+                onSubmit={
+                  handleSubmitQuestionnaire
+                }
+                className="mt-8"
+              >
+                <div className="space-y-6">
+                  {questionnaire.map(
+                    (question, index) => {
+                      const selectedValue =
+                        questionnaireAnswers[
+                          question.id
+                        ];
+
+                      const reverse =
+                        isReverseItem(
+                          question
+                        );
+
+                      return (
+                        <div
+                          key={question.id}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                        >
+
+                          {/* QUESTION NUMBER */}
+
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                                Question {index + 1}
+                              </span>
+
+                              <p className="mt-2 text-sm font-bold leading-relaxed text-slate-900">
+                                {question.a2}
+                              </p>
+
+                              <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                                {question.a3}
+                              </p>
+                            </div>
+
+                            {reverse && (
+                              <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-1 text-[8px] font-bold text-slate-400">
+                                Reverse Scored
+                              </span>
+                            )}
+                          </div>
+
+                          {/* OPTIONS */}
+
+                          <div className="mt-5 grid grid-cols-5 gap-1.5 sm:gap-2">
+                            {likertScale.map(
+                              option => {
+                                const isSelected =
+                                  selectedValue ===
+                                  option.value;
+
+                                return (
+                                  <label
+                                    key={option.value}
+                                    className={`cursor-pointer rounded-xl border p-2 text-center transition-all sm:p-3 ${
+                                      isSelected
+                                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100'
+                                        : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
+                                    }`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={`question-${question.id}`}
+                                      value={option.value}
+                                      checked={
+                                        isSelected
+                                      }
+                                      onChange={() =>
+                                        handleQuestionnaireAnswer(
+                                          question.id,
+                                          option.value
+                                        )
+                                      }
+                                      className="sr-only"
+                                    />
+
+                                    <div
+                                      className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold ${
+                                        isSelected
+                                          ? 'bg-blue-600 text-white'
+                                          : 'bg-slate-100 text-slate-600'
+                                      }`}
+                                    >
+                                      {option.value}
+                                    </div>
+
+                                    <p
+                                      className={`mt-1.5 text-[8px] font-bold sm:text-[10px] ${
+                                        isSelected
+                                          ? 'text-blue-700'
+                                          : 'text-slate-500'
+                                      }`}
+                                    >
+                                      {option.label}
+                                    </p>
+                                  </label>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+
+                {/* SUBMIT */}
+
+                <div className="mt-8 flex flex-col gap-4 rounded-2xl bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-extrabold text-slate-800">
+                      Ready to submit?
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      {answeredQuestionCount} of {questionnaire.length} questions answered.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={
+                      isQuestionnaireSubmitting ||
+                      answeredQuestionCount !==
+                        questionnaire.length
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isQuestionnaireSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Submit Questionnaire
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+          {/* SCORE */}
+
+          {questionnaireSubmitted &&
+            questionnaireScore !== null && (
+              <div className="mt-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />
+
+                  <div>
+                    <h3 className="text-lg font-extrabold text-emerald-800">
+                      Questionnaire Submitted
+                    </h3>
+
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Your responses have been recorded successfully.
+                    </p>
+
+                    <div className="mt-4 flex items-end gap-2">
+                      <span className="text-3xl font-extrabold text-emerald-700">
+                        {questionnaireScore}
+                      </span>
+
+                      <span className="pb-1 text-xs font-semibold text-emerald-600">
+                        / 325
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-[10px] text-emerald-600">
+                      Higher scores indicate stronger executive-functioning skills.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+        </div>
 
         {/* ------------------------------------------------ */}
         {/* SUPPORT TICKETS */}
@@ -1278,17 +1825,12 @@ const handleCloseTicket = async (ticketId: string) => {
           {/* HEADER */}
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
             <div className="flex items-center gap-3">
-
               <div className="rounded-xl bg-indigo-50 p-3">
-
                 <MessageSquare className="h-5 w-5 text-indigo-600" />
-
               </div>
 
               <div>
-
                 <h2 className="text-xl font-extrabold text-slate-900">
                   My Support Tickets
                 </h2>
@@ -1296,9 +1838,7 @@ const handleCloseTicket = async (ticketId: string) => {
                 <p className="mt-1 text-xs text-slate-500">
                   View and manage support requests submitted from your account.
                 </p>
-
               </div>
-
             </div>
 
             <button
@@ -1307,7 +1847,6 @@ const handleCloseTicket = async (ticketId: string) => {
               disabled={isTicketsLoading}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-
               <RefreshCw
                 className={`h-4 w-4 ${
                   isTicketsLoading
@@ -1317,46 +1856,34 @@ const handleCloseTicket = async (ticketId: string) => {
               />
 
               Refresh
-
             </button>
-
           </div>
 
           {/* TICKETS ERROR */}
 
           {ticketsError && (
-
             <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4">
-
               <div className="flex items-start gap-3">
-
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
 
                 <p className="text-sm text-red-700">
                   {ticketsError}
                 </p>
-
               </div>
-
             </div>
-
           )}
 
           {/* TICKETS LOADING */}
 
           {isTicketsLoading &&
             !ticketsError && (
-
               <div className="mt-8 flex flex-col items-center justify-center py-10">
-
                 <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
 
                 <p className="mt-3 text-xs font-semibold text-slate-500">
                   Loading your support tickets...
                 </p>
-
               </div>
-
             )}
 
           {/* NO TICKETS */}
@@ -1364,9 +1891,7 @@ const handleCloseTicket = async (ticketId: string) => {
           {!isTicketsLoading &&
             !ticketsError &&
             supportTickets.length === 0 && (
-
               <div className="mt-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
-
                 <MessageSquare className="mx-auto h-8 w-8 text-slate-300" />
 
                 <h3 className="mt-3 text-sm font-extrabold text-slate-700">
@@ -1386,9 +1911,7 @@ const handleCloseTicket = async (ticketId: string) => {
                 >
                   Contact Support
                 </button>
-
               </div>
-
             )}
 
           {/* TICKETS */}
@@ -1396,12 +1919,9 @@ const handleCloseTicket = async (ticketId: string) => {
           {!isTicketsLoading &&
             !ticketsError &&
             supportTickets.length > 0 && (
-
               <div className="mt-6 space-y-4">
-
                 {supportTickets.map(
                   ticket => {
-
                     const isOpen =
                       Number(ticket.mstatus) === 0;
 
@@ -1410,7 +1930,6 @@ const handleCloseTicket = async (ticketId: string) => {
                       ticket.ticketId;
 
                     return (
-
                       <div
                         key={ticket.id}
                         className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-blue-200 hover:bg-white"
@@ -1419,11 +1938,8 @@ const handleCloseTicket = async (ticketId: string) => {
                         {/* TOP */}
 
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-
                           <div>
-
                             <div className="flex flex-wrap items-center gap-2">
-
                               <span className="font-mono text-xs font-extrabold tracking-wider text-indigo-600">
                                 {ticket.ticketId}
                               </span>
@@ -1437,7 +1953,6 @@ const handleCloseTicket = async (ticketId: string) => {
                                   ticket.mstatus
                                 )}
                               </span>
-
                             </div>
 
                             <h3 className="mt-2 text-sm font-extrabold text-slate-900">
@@ -1445,55 +1960,43 @@ const handleCloseTicket = async (ticketId: string) => {
                                 ticket.category
                               )}
                             </h3>
-
                           </div>
 
                           <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-
                             <Clock className="h-3.5 w-3.5" />
 
                             {formatTicketDate(
                               ticket.createdAt
                             )}
-
                           </div>
-
                         </div>
 
                         {/* MESSAGE */}
 
                         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-
                           <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
                             {ticket.message}
                           </p>
-
                         </div>
 
                         {/* META */}
 
                         <div className="mt-4 flex flex-col gap-3 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-
                           <div className="flex flex-col gap-1">
-
                             <span>
                               Email: {ticket.email}
                             </span>
 
                             {ticket.affiliation && (
-
                               <span>
                                 Affiliation: {ticket.affiliation}
                               </span>
-
                             )}
-
                           </div>
 
                           {/* CLOSE TICKET */}
 
                           {isOpen && (
-
                             <button
                               type="button"
                               onClick={() =>
@@ -1504,40 +2007,26 @@ const handleCloseTicket = async (ticketId: string) => {
                               disabled={isClosing}
                               className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-[10px] font-bold text-red-600 transition-all hover:border-red-300 hover:bg-red-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-
                               {isClosing ? (
-
                                 <>
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                   Closing Ticket...
                                 </>
-
                               ) : (
-
                                 <>
                                   <XCircle className="h-3.5 w-3.5" />
                                   Close Ticket
                                 </>
-
                               )}
-
                             </button>
-
                           )}
-
                         </div>
-
                       </div>
-
                     );
-
                   }
                 )}
-
               </div>
-
             )}
-
         </div>
 
         {/* ------------------------------------------------ */}
@@ -1545,23 +2034,18 @@ const handleCloseTicket = async (ticketId: string) => {
         {/* ------------------------------------------------ */}
 
         <div className="mt-8 flex justify-end">
-
           <button
             type="button"
             onClick={onLogout}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
           >
-
             <LogOut className="h-4 w-4" />
 
             Sign Out
-
           </button>
-
         </div>
 
       </div>
-
     </div>
   );
 }
