@@ -309,96 +309,132 @@ export default function Dashboard({
   // CLOSE SUPPORT TICKET
   // --------------------------------------------------
 
-  const handleCloseTicket =
-    async (ticketId: string) => {
+// --------------------------------------------------
+// CLOSE SUPPORT TICKET
+// --------------------------------------------------
 
-      if (!ticketId) {
-        return;
+const handleCloseTicket = async (ticketId: string) => {
+
+  if (!ticketId) {
+    return;
+  }
+
+  if (!userId) {
+    setTicketsError(
+      'Unable to identify your account. Please sign in again.'
+    );
+    return;
+  }
+
+  const confirmed = window.confirm(
+    'Are you sure you want to close this support ticket? This will mark the ticket as resolved.'
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+
+    setClosingTicketId(ticketId);
+    setTicketsError(null);
+    setSuccess(null);
+
+    const response = await fetch(
+      `${apiBaseUrl}/supportticket/${encodeURIComponent(ticketId)}/close`,
+      {
+        method: 'PUT',
+
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+
+        body: JSON.stringify({
+          userId: Number(userId),
+        }),
       }
+    );
 
-      const confirmed =
-        window.confirm(
-          'Are you sure you want to close this support ticket? This will mark the ticket as resolved.'
-        );
+    // --------------------------------------------------
+    // SAFELY READ RESPONSE
+    // --------------------------------------------------
 
-      if (!confirmed) {
-        return;
-      }
+    const contentType =
+      response.headers.get('content-type') || '';
 
-      try {
+    let data: any = null;
 
-        setClosingTicketId(ticketId);
-        setTicketsError(null);
+    if (contentType.includes('application/json')) {
 
-        const response =
-          await fetch(
-            `${apiBaseUrl}/usersupport/${encodeURIComponent(
-              ticketId
-            )}/close`,
-            {
-              method: 'PUT',
+      data = await response.json();
 
-              headers: {
-                'Content-Type':
-                  'application/json',
-              },
+    } else {
+
+      const text = await response.text();
+
+      console.error(
+        'Unexpected non-JSON response when closing ticket:',
+        text
+      );
+
+      throw new Error(
+        `Server returned an unexpected response (${response.status}).`
+      );
+
+    }
+
+    // --------------------------------------------------
+    // HANDLE API ERROR
+    // --------------------------------------------------
+
+    if (!response.ok || !data?.success) {
+
+      throw new Error(
+        data?.message ||
+        'Unable to close this support ticket.'
+      );
+
+    }
+
+    // --------------------------------------------------
+    // UPDATE TICKET LOCALLY
+    // --------------------------------------------------
+
+    setSupportTickets(previousTickets =>
+      previousTickets.map(ticket =>
+        ticket.ticketId === ticketId
+          ? {
+              ...ticket,
+              mstatus: 1,
             }
-          );
+          : ticket
+      )
+    );
 
-        const data =
-          await response.json();
+    setSuccess(
+      data.message ||
+      `Support ticket ${ticketId} has been marked as resolved.`
+    );
 
-        if (
-          !response.ok ||
-          !data.success
-        ) {
+  } catch (err: any) {
 
-          throw new Error(
-            data.message ||
-            'Unable to close this support ticket.'
-          );
+    console.error(
+      'Support ticket close error:',
+      err
+    );
 
-        }
+    setTicketsError(
+      err?.message ||
+      'Unable to close this support ticket. Please try again.'
+    );
 
-        // ------------------------------------------------
-        // UPDATE THE TICKET LOCALLY
-        // ------------------------------------------------
+  } finally {
 
-        setSupportTickets(
-          previousTickets =>
-            previousTickets.map(ticket =>
-              ticket.ticketId === ticketId
-                ? {
-                    ...ticket,
-                    mstatus: 1,
-                  }
-                : ticket
-            )
-        );
+    setClosingTicketId(null);
 
-        setSuccess(
-          `Support ticket ${ticketId} has been marked as resolved.`
-        );
-
-      } catch (err: any) {
-
-        console.error(
-          'Support ticket close error:',
-          err
-        );
-
-        setTicketsError(
-          err?.message ||
-          'Unable to close this support ticket. Please try again.'
-        );
-
-      } finally {
-
-        setClosingTicketId(null);
-
-      }
-
-    };
+  }
+};
 
   // --------------------------------------------------
   // HANDLE INPUT
