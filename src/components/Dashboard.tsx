@@ -93,6 +93,12 @@ const emptyProfile: ProfileForm = {
   backgroundInformation: '',
 };
 
+/*
+ * --------------------------------------------------
+ * QUESTIONNAIRE SCALE
+ * --------------------------------------------------
+ */
+
 const likertScale: {
   value: number;
   label: string;
@@ -508,9 +514,10 @@ export default function Dashboard({
           'Your questionnaire has been submitted successfully.'
         );
 
-        // IMPORTANT:
-        // Do NOT scroll the outer page here.
-        // The questionnaire has its own scroll area.
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth',
+        });
       } catch (err: any) {
         console.error(
           'Questionnaire submission error:',
@@ -721,24 +728,18 @@ export default function Dashboard({
           method: 'PUT',
 
           headers: {
-            'Content-Type':
-              'application/json',
-
-            Accept:
-              'application/json',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
 
           body: JSON.stringify({
-            userId:
-              Number(userId),
+            userId: Number(userId),
           }),
         }
       );
 
       const contentType =
-        response.headers.get(
-          'content-type'
-        ) || '';
+        response.headers.get('content-type') || '';
 
       let data: any = null;
 
@@ -805,7 +806,7 @@ export default function Dashboard({
   };
 
   // --------------------------------------------------
-  // HANDLE INPUT
+  // HANDLE PROFILE INPUT
   // --------------------------------------------------
 
   const handleChange = (
@@ -822,7 +823,7 @@ export default function Dashboard({
   };
 
   // --------------------------------------------------
-  // VALIDATE FORM
+  // VALIDATE PROFILE
   // --------------------------------------------------
 
   const validateForm = () => {
@@ -1307,9 +1308,7 @@ export default function Dashboard({
                 min="0"
                 max="100"
                 required
-                value={
-                  form.yearsOfEducation
-                }
+                value={form.yearsOfEducation}
                 onChange={(e) =>
                   handleChange(
                     'yearsOfEducation',
@@ -1370,9 +1369,7 @@ export default function Dashboard({
 
               <select
                 required
-                value={
-                  form.educationLevel
-                }
+                value={form.educationLevel}
                 onChange={(e) =>
                   handleChange(
                     'educationLevel',
@@ -1502,329 +1499,115 @@ export default function Dashboard({
         {/* EXECUTIVE FUNCTIONING QUESTIONNAIRE */}
         {/* ------------------------------------------------ */}
 
-        <div className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
 
-          {/* ------------------------------------------------ */}
-          {/* QUESTIONNAIRE HEADER */}
-          {/* ------------------------------------------------ */}
+          {/* HEADER */}
 
-          <div className="p-6 sm:p-8 pb-0">
-
-            <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-blue-50 p-3">
-                  <Brain className="h-5 w-5 text-blue-600" />
-                </div>
-
-                <div>
-                  <h2 className="text-xl font-extrabold text-slate-900">
-                    Executive Functioning Questionnaire
-                  </h2>
-
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    Please answer each statement based on how often the statement
-                    describes your typical academic experience.
-                  </p>
-                </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-blue-50 p-2.5">
+                <Brain className="h-5 w-5 text-blue-600" />
               </div>
 
-              {/* SCALE */}
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900">
+                  Executive Functioning Questionnaire
+                </h2>
 
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
-                <p className="text-xs font-extrabold text-slate-700">
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Please answer each statement based on how often the statement describes your typical academic experience.
+                </p>
+              </div>
+            </div>
+
+            {/* COMPACT SCALE */}
+
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">
                   Five-Point Scale
                 </p>
 
-                <div className="mt-3 grid grid-cols-5 gap-1.5">
-                  {likertScale.map(option => (
-                    <div
-                      key={option.value}
-                      className="rounded-lg border border-blue-100 bg-white px-2 py-2 text-center"
-                    >
-                      <p className="text-sm font-extrabold text-blue-600">
-                        {option.value}
-                      </p>
-
-                      <p className="mt-0.5 text-[9px] font-bold text-slate-600 sm:text-[10px]">
-                        {option.label}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="mt-3 text-[10px] leading-relaxed text-slate-500">
-                  Higher scores indicate stronger executive-functioning skills
-                  within the relevant domain.
+                <p className="hidden text-[9px] text-slate-500 sm:block">
+                  Higher scores = stronger executive functioning
                 </p>
+              </div>
+
+              <div className="mt-2 grid grid-cols-5 gap-1">
+                {likertScale.map(option => (
+                  <div
+                    key={option.value}
+                    className="rounded-md border border-blue-100 bg-white px-1.5 py-1.5 text-center"
+                  >
+                    <span className="text-xs font-extrabold text-blue-600">
+                      {option.value}
+                    </span>
+
+                    <span className="ml-1 text-[8px] font-bold text-slate-500 sm:text-[9px]">
+                      {option.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
           {/* ------------------------------------------------ */}
-          {/* QUESTIONNAIRE SCROLL AREA */}
+          {/* FLOATING / STICKY QUESTION PROGRESS */}
           {/* ------------------------------------------------ */}
 
           {!isQuestionnaireLoading &&
             questionnaire.length > 0 && (
-              <div className="mt-6">
+              <div className="sticky top-3 z-30 mt-4 mb-4">
+                <div className="rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-md backdrop-blur-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 text-[9px] font-mono font-bold uppercase tracking-wider text-slate-500">
+                        Progress
+                      </span>
 
-                {/* ------------------------------------------------ */}
-                {/* STICKY PROGRESS BAR */}
-                {/* ------------------------------------------------ */}
-
-                <div className="sticky top-0 z-30 border-y border-slate-200 bg-white/95 px-6 py-4 backdrop-blur-sm sm:px-8">
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
-                      Questionnaire Progress
-                    </span>
-
-                    <span className="text-xs font-extrabold text-blue-600">
-                      {answeredQuestionCount} / {questionnaire.length}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-blue-600 transition-[width] duration-300 ease-out"
-                      style={{
-                        width: `${questionnaireProgress}%`,
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-1 flex justify-between">
-                    <span className="text-[9px] text-slate-400">
-                      {questionnaireProgress}% complete
-                    </span>
-
-                    <span className="text-[9px] text-slate-400">
-                      {questionnaire.length -
-                        answeredQuestionCount}{' '}
-                      remaining
-                    </span>
-                  </div>
-                </div>
-
-                {/* ------------------------------------------------ */}
-                {/* ERROR */}
-                {/* ------------------------------------------------ */}
-
-                {questionnaireError && (
-                  <div className="mx-6 mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 sm:mx-8">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-
-                      <p className="text-sm text-red-700">
-                        {questionnaireError}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* ------------------------------------------------ */}
-                {/* ACTUAL SCROLLABLE QUESTIONS */}
-                {/* ------------------------------------------------ */}
-
-                <form
-                  onSubmit={
-                    handleSubmitQuestionnaire
-                  }
-                  className="mt-4"
-                >
-                  <div
-                    className="
-                      mx-6
-                      max-h-[650px]
-                      overflow-y-auto
-                      overscroll-contain
-                      rounded-2xl
-                      border
-                      border-slate-200
-                      bg-slate-50
-                      p-3
-                      pr-2
-                      sm:mx-8
-                      sm:p-4
-                      sm:pr-3
-                    "
-                    style={{
-                      scrollbarGutter:
-                        'stable',
-                    }}
-                  >
-
-                    <div className="space-y-5">
-                      {questionnaire.map(
-                        (question, index) => {
-                          const selectedValue =
-                            questionnaireAnswers[
-                              question.id
-                            ];
-
-                          const reverse =
-                            isReverseItem(
-                              question
-                            );
-
-                          return (
-                            <div
-                              key={
-                                question.id
-                              }
-                              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                            >
-
-                              {/* QUESTION NUMBER */}
-
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                                    Question{' '}
-                                    {index + 1}
-                                  </span>
-
-                                  <p className="mt-2 text-sm font-bold leading-relaxed text-slate-900">
-                                    {
-                                      question.a2
-                                    }
-                                  </p>
-
-                                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                                    {
-                                      question.a3
-                                    }
-                                  </p>
-                                </div>
-
-                                {reverse && (
-                                  <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-bold text-slate-400">
-                                    Reverse Scored
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* OPTIONS */}
-
-                              <div className="mt-5 grid grid-cols-5 gap-1.5 sm:gap-2">
-                                {likertScale.map(
-                                  option => {
-                                    const isSelected =
-                                      selectedValue ===
-                                      option.value;
-
-                                    return (
-                                      <label
-                                        key={
-                                          option.value
-                                        }
-                                        className={`cursor-pointer rounded-xl border p-2 text-center transition-all sm:p-3 ${
-                                          isSelected
-                                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100'
-                                            : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
-                                        }`}
-                                      >
-                                        <input
-                                          type="radio"
-                                          name={`question-${question.id}`}
-                                          value={
-                                            option.value
-                                          }
-                                          checked={
-                                            isSelected
-                                          }
-                                          onChange={() =>
-                                            handleQuestionnaireAnswer(
-                                              question.id,
-                                              option.value
-                                            )
-                                          }
-                                          className="sr-only"
-                                        />
-
-                                        <div
-                                          className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold ${
-                                            isSelected
-                                              ? 'bg-blue-600 text-white'
-                                              : 'bg-slate-100 text-slate-600'
-                                          }`}
-                                        >
-                                          {
-                                            option.value
-                                          }
-                                        </div>
-
-                                        <p
-                                          className={`mt-1.5 text-[8px] font-bold sm:text-[10px] ${
-                                            isSelected
-                                              ? 'text-blue-700'
-                                              : 'text-slate-500'
-                                          }`}
-                                        >
-                                          {
-                                            option.label
-                                          }
-                                        </p>
-                                      </label>
-                                    );
-                                  }
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
-
-                    {/* ------------------------------------------------ */}
-                    {/* SUBMIT SECTION */}
-                    {/* ------------------------------------------------ */}
-
-                    <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-extrabold text-slate-800">
-                            Ready to submit?
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            {answeredQuestionCount}{' '}
-                            of{' '}
-                            {questionnaire.length}{' '}
-                            questions answered.
-                          </p>
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={
-                            isQuestionnaireSubmitting ||
-                            answeredQuestionCount !==
-                              questionnaire.length
-                          }
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {isQuestionnaireSubmitting ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Submitting...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle2 className="h-4 w-4" />
-                              Submit Questionnaire
-                            </>
-                          )}
-                        </button>
+                      <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                        <div
+                          className="h-full rounded-full bg-blue-600 transition-all duration-200"
+                          style={{
+                            width: `${questionnaireProgress}%`,
+                          }}
+                        />
                       </div>
                     </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-500">
+                        {answeredQuestionCount}/{questionnaire.length}
+                      </span>
+
+                      <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-extrabold text-blue-600">
+                        {questionnaireProgress}%
+                      </span>
+                    </div>
                   </div>
-                </form>
+                </div>
               </div>
             )}
 
           {/* ------------------------------------------------ */}
-          {/* QUESTIONNAIRE LOADING */}
+          {/* QUESTIONNAIRE ERROR */}
+          {/* ------------------------------------------------ */}
+
+          {questionnaireError && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+
+                <p className="text-xs text-red-700">
+                  {questionnaireError}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ------------------------------------------------ */}
+          {/* LOADING */}
           {/* ------------------------------------------------ */}
 
           {isQuestionnaireLoading && (
@@ -1838,17 +1621,188 @@ export default function Dashboard({
           )}
 
           {/* ------------------------------------------------ */}
+          {/* QUESTIONNAIRE */}
+          {/* ------------------------------------------------ */}
+
+          {!isQuestionnaireLoading &&
+            questionnaire.length > 0 && (
+              <form
+                onSubmit={
+                  handleSubmitQuestionnaire
+                }
+                className="mt-2"
+              >
+
+                {/* IMPORTANT:
+                    No fixed height.
+                    No overflow-y-auto.
+                    No nested scrollbar.
+                */}
+
+                <div className="space-y-3">
+
+                  {questionnaire.map(
+                    (question, index) => {
+                      const selectedValue =
+                        questionnaireAnswers[
+                          question.id
+                        ];
+
+                      const reverse =
+                        isReverseItem(
+                          question
+                        );
+
+                      return (
+                        <div
+                          key={question.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 sm:px-4 sm:py-3.5"
+                        >
+
+                          {/* QUESTION */}
+
+                          <div className="flex items-start gap-2.5">
+                            <span className="mt-0.5 shrink-0 rounded-md bg-blue-50 px-1.5 py-1 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-600">
+                              {index + 1}
+                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[12px] font-bold leading-snug text-slate-900 sm:text-sm">
+                                  {question.a2}
+                                </p>
+
+                                {reverse && (
+                                  <span className="hidden shrink-0 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold text-slate-400 sm:inline-block">
+                                    Reverse
+                                  </span>
+                                )}
+                              </div>
+
+                              {question.a3 && (
+                                <p className="mt-1 text-[9px] leading-snug text-slate-500 sm:text-[10px]">
+                                  {question.a3}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* COMPACT OPTIONS */}
+
+                          <div className="mt-3 grid grid-cols-5 gap-1 sm:gap-1.5">
+                            {likertScale.map(
+                              option => {
+                                const isSelected =
+                                  selectedValue ===
+                                  option.value;
+
+                                return (
+                                  <label
+                                    key={option.value}
+                                    className={`cursor-pointer rounded-lg border px-1 py-1.5 text-center transition-all sm:px-2 sm:py-2 ${
+                                      isSelected
+                                        ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-100'
+                                        : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
+                                    }`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={`question-${question.id}`}
+                                      value={option.value}
+                                      checked={
+                                        isSelected
+                                      }
+                                      onChange={() =>
+                                        handleQuestionnaireAnswer(
+                                          question.id,
+                                          option.value
+                                        )
+                                      }
+                                      className="sr-only"
+                                    />
+
+                                    <div
+                                      className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-extrabold sm:h-6 sm:w-6 sm:text-[10px] ${
+                                        isSelected
+                                          ? 'bg-blue-600 text-white'
+                                          : 'bg-slate-100 text-slate-600'
+                                      }`}
+                                    >
+                                      {option.value}
+                                    </div>
+
+                                    <p
+                                      className={`mt-0.5 text-[7px] font-bold leading-tight sm:text-[9px] ${
+                                        isSelected
+                                          ? 'text-blue-700'
+                                          : 'text-slate-500'
+                                      }`}
+                                    >
+                                      {option.label}
+                                    </p>
+                                  </label>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+
+                {/* ------------------------------------------------ */}
+                {/* SUBMIT */}
+                {/* ------------------------------------------------ */}
+
+                <div className="mt-5 flex flex-col gap-3 rounded-xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-extrabold text-slate-800">
+                      Ready to submit?
+                    </p>
+
+                    <p className="mt-0.5 text-[10px] text-slate-500">
+                      {answeredQuestionCount} of {questionnaire.length} questions answered.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={
+                      isQuestionnaireSubmitting ||
+                      answeredQuestionCount !==
+                        questionnaire.length
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isQuestionnaireSubmitting ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Submit Questionnaire
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+          {/* ------------------------------------------------ */}
           {/* SCORE */}
           {/* ------------------------------------------------ */}
 
           {questionnaireSubmitted &&
             questionnaireScore !== null && (
-              <div className="m-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 sm:m-8">
+              <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
 
                   <div>
-                    <h3 className="text-lg font-extrabold text-emerald-800">
+                    <h3 className="text-base font-extrabold text-emerald-800">
                       Questionnaire Submitted
                     </h3>
 
@@ -1856,11 +1810,9 @@ export default function Dashboard({
                       Your responses have been recorded successfully.
                     </p>
 
-                    <div className="mt-4 flex items-end gap-2">
+                    <div className="mt-3 flex items-end gap-2">
                       <span className="text-3xl font-extrabold text-emerald-700">
-                        {
-                          questionnaireScore
-                        }
+                        {questionnaireScore}
                       </span>
 
                       <span className="pb-1 text-xs font-semibold text-emerald-600">
@@ -1868,7 +1820,7 @@ export default function Dashboard({
                       </span>
                     </div>
 
-                    <p className="mt-1 text-[10px] text-emerald-600">
+                    <p className="mt-1 text-[9px] text-emerald-600">
                       Higher scores indicate stronger executive-functioning skills.
                     </p>
                   </div>
@@ -1882,6 +1834,8 @@ export default function Dashboard({
         {/* ------------------------------------------------ */}
 
         <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+
+          {/* HEADER */}
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -1902,12 +1856,8 @@ export default function Dashboard({
 
             <button
               type="button"
-              onClick={
-                loadSupportTickets
-              }
-              disabled={
-                isTicketsLoading
-              }
+              onClick={loadSupportTickets}
+              disabled={isTicketsLoading}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw
@@ -1953,8 +1903,7 @@ export default function Dashboard({
 
           {!isTicketsLoading &&
             !ticketsError &&
-            supportTickets.length ===
-              0 && (
+            supportTickets.length === 0 && (
               <div className="mt-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
                 <MessageSquare className="mx-auto h-8 w-8 text-slate-300" />
 
@@ -1969,9 +1918,7 @@ export default function Dashboard({
                 <button
                   type="button"
                   onClick={() =>
-                    setActiveTab(
-                      'contact'
-                    )
+                    setActiveTab('contact')
                   }
                   className="mt-5 inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-blue-700 active:scale-95"
                 >
@@ -1984,15 +1931,12 @@ export default function Dashboard({
 
           {!isTicketsLoading &&
             !ticketsError &&
-            supportTickets.length >
-              0 && (
+            supportTickets.length > 0 && (
               <div className="mt-6 space-y-4">
                 {supportTickets.map(
                   ticket => {
                     const isOpen =
-                      Number(
-                        ticket.mstatus
-                      ) === 0;
+                      Number(ticket.mstatus) === 0;
 
                     const isClosing =
                       closingTicketId ===
@@ -2010,9 +1954,7 @@ export default function Dashboard({
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-mono text-xs font-extrabold tracking-wider text-indigo-600">
-                                {
-                                  ticket.ticketId
-                                }
+                                {ticket.ticketId}
                               </span>
 
                               <span
@@ -2046,9 +1988,7 @@ export default function Dashboard({
 
                         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
                           <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
-                            {
-                              ticket.message
-                            }
+                            {ticket.message}
                           </p>
                         </div>
 
@@ -2057,18 +1997,12 @@ export default function Dashboard({
                         <div className="mt-4 flex flex-col gap-3 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex flex-col gap-1">
                             <span>
-                              Email:{' '}
-                              {
-                                ticket.email
-                              }
+                              Email: {ticket.email}
                             </span>
 
                             {ticket.affiliation && (
                               <span>
-                                Affiliation:{' '}
-                                {
-                                  ticket.affiliation
-                                }
+                                Affiliation: {ticket.affiliation}
                               </span>
                             )}
                           </div>
@@ -2083,9 +2017,7 @@ export default function Dashboard({
                                   ticket.ticketId
                                 )
                               }
-                              disabled={
-                                isClosing
-                              }
+                              disabled={isClosing}
                               className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-[10px] font-bold text-red-600 transition-all hover:border-red-300 hover:bg-red-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {isClosing ? (
